@@ -3,16 +3,34 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
 import pandas as pd
 
 
 DATA_PATH = Path(__file__).parent / "data" / "sample_kols.csv"
+REQUIRED_COLUMNS = [
+    "name",
+    "handle",
+    "profile_url",
+    "niche_tags",
+    "style_tags",
+    "location",
+    "followers",
+    "avg_views",
+    "engagement_rate",
+    "audience_age",
+    "audience_gender_skew",
+    "cost_tier",
+    "brand_safety_notes",
+]
 
 
 def load_sample_kols(path: Path = DATA_PATH) -> pd.DataFrame:
     df = pd.read_csv(path)
+    missing_columns = [column for column in REQUIRED_COLUMNS if column not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required KOL columns: {', '.join(missing_columns)}")
     for column in ["niche_tags", "style_tags"]:
         df[column] = df[column].fillna("").astype(str)
     df["profile_url"] = df["profile_url"].fillna("")
@@ -32,39 +50,80 @@ def load_kols(use_apify: bool = False) -> tuple[pd.DataFrame, list[str]]:
 
 
 def _normalize_tiktok_profile_url(url: Any) -> str:
+    handle = _extract_tiktok_handle_from_url(url)
+    if not handle:
+        return ""
+    return f"https://www.tiktok.com/@{handle}"
+
+
+def _extract_tiktok_handle_from_url(url: Any) -> str:
     if not url:
         return ""
     text = str(url).strip()
     if not text:
         return ""
+    if text.startswith("www.tiktok.com/") or text.startswith("tiktok.com/"):
+        text = f"https://{text}"
 
     parsed = urlsplit(text)
+    host = parsed.netloc.lower()
+    if host not in {"tiktok.com", "www.tiktok.com"} and not host.endswith(".tiktok.com"):
+        return ""
+
     path_parts = [part for part in parsed.path.split("/") if part]
     handle_part = next((part for part in path_parts if part.startswith("@")), "")
     if not handle_part:
         return ""
-    return urlunsplit((parsed.scheme or "https", parsed.netloc or "www.tiktok.com", f"/{handle_part}", "", ""))
+    return _clean_handle(handle_part)
+
+
+def _clean_handle(value: Any) -> str:
+    if value is None:
+        return ""
+    handle = str(value).strip().lstrip("@")
+    if not handle or handle.lower() == "unknown":
+        return ""
+    return handle
+
+
+def _first_handle(*values: Any) -> str:
+    for value in values:
+        handle = _clean_handle(value)
+        if handle:
+            return handle
+    return ""
 
 
 def normalize_apify_profile(raw: dict[str, Any]) -> dict[str, Any]:
     author_meta = raw.get("authorMeta") or {}
     author_data = raw.get("author") or {}
     author = author_meta or author_data
-    handle = author.get("name") or raw.get("username") or raw.get("handle") or "unknown"
-    normalized_handle = str(handle).lstrip("@")
     followers = author.get("fans") or author.get("followers") or raw.get("followers") or 0
-    profile_url = (
+    explicit_profile_url = (
         _normalize_tiktok_profile_url(author_meta.get("profileUrl"))
         or _normalize_tiktok_profile_url(author_meta.get("profile_url"))
         or _normalize_tiktok_profile_url(author_data.get("profileUrl"))
         or _normalize_tiktok_profile_url(author_data.get("profile_url"))
         or _normalize_tiktok_profile_url(raw.get("profileUrl"))
         or _normalize_tiktok_profile_url(raw.get("profile_url"))
-        or _normalize_tiktok_profile_url(raw.get("webVideoUrl"))
-        or f"https://www.tiktok.com/@{normalized_handle}"
     )
+    normalized_handle = (
+        _first_handle(
+            author_meta.get("name"),
+            author_meta.get("uniqueId"),
+            author_data.get("name"),
+            author_data.get("uniqueId"),
+            raw.get("username"),
+            raw.get("uniqueId"),
+            raw.get("handle"),
+        )
+        or _extract_tiktok_handle_from_url(explicit_profile_url)
+        or _extract_tiktok_handle_from_url(raw.get("webVideoUrl"))
+        or "unknown"
+    )
+    profile_url = explicit_profile_url or f"https://www.tiktok.com/@{normalized_handle}"
     return {
-        "name": author.get("nickName") or raw.get("name") or handle,
+        "name": author.get("nickName") or raw.get("name") or normalized_handle,
         "handle": f"@{normalized_handle}",
         "profile_url": profile_url,
         "niche_tags": raw.get("niche_tags", ""),
