@@ -29,11 +29,17 @@ streamlit run app.py
 Set environment variables in your shell:
 
 ```powershell
-$env:OPENAI_API_KEY="your-openai-key"
+$env:OPENAI_API_KEY="paste-your-real-openai-api-key-here"
 $env:APIFY_TOKEN="paste-your-real-apify-api-token-here"
 ```
 
-The app works without these keys. The current brand analyzer uses deterministic heuristics. `APIFY_TOKEN` enables live TikTok collection through Apify. If Apify fails or returns no usable profiles, the app falls back to sample data.
+The app works without these keys. `OPENAI_API_KEY` enables AI brand-profile extraction with heuristic fallback. `APIFY_TOKEN` enables live TikTok collection through Apify. Live Apify profiles are filtered for brand relevance and Thai-market signals before ranking. If Apify fails or returns no usable profiles, the app falls back to sample data.
+
+Optional OpenAI model override:
+
+```powershell
+$env:OPENAI_MODEL="gpt-4o-mini"
+```
 
 Run with live Apify collection:
 
@@ -70,7 +76,7 @@ If Apify returns `User was not found or authentication token is not valid`, crea
 4. Review the Brand Profile Summary.
 5. Walk through Top 5 KOL cards and the detailed ranking table.
 6. Download CSV and Markdown reports.
-7. Explain that the app runs without keys, and with `APIFY_TOKEN` it can pull live TikTok profiles through Apify.
+7. Explain that the app runs without keys, with `OPENAI_API_KEY` it uses AI brand extraction, and with `APIFY_TOKEN` it can pull live Thai-market TikTok profiles through Apify.
 
 ## Ethics and Privacy
 

@@ -12,6 +12,18 @@ import pandas as pd
 DATA_PATH = Path(__file__).parent / "data" / "sample_kols.csv"
 DEFAULT_APIFY_ACTOR_ID = "clockworks/free-tiktok-scraper"
 DEFAULT_APIFY_MAX_ITEMS = 20
+THAI_MARKET_TERMS = {
+    "thailand",
+    "thai",
+    "bangkok",
+    "bkk",
+    "ari",
+    "sukhumvit",
+    "siam",
+    "bangkokcafe",
+    "bkkcafe",
+    "cafehoppingbkk",
+}
 REQUIRED_COLUMNS = [
     "name",
     "handle",
@@ -126,6 +138,8 @@ def fetch_apify_kols(
             continue
         if not _is_brand_relevant_live_item(item, row, brand_profile or {}):
             continue
+        if not _is_thai_market_live_item(item, row, brand_profile or {}):
+            continue
         rows.append(row)
     return pd.DataFrame(rows, columns=REQUIRED_COLUMNS)
 
@@ -156,7 +170,7 @@ def build_apify_actor_input(brand_profile: dict[str, Any], max_items: int) -> di
 
 def _hashtags_from_brand_profile(brand_profile: dict[str, Any]) -> list[str]:
     values: list[str] = []
-    for key in ["keywords", "content_pillars"]:
+    for key in ["keywords", "content_pillars", "thai_search_terms"]:
         raw_value = brand_profile.get(key, [])
         if isinstance(raw_value, str):
             values.append(raw_value)
@@ -239,15 +253,36 @@ def _is_brand_relevant_live_item(raw: dict[str, Any], row: dict[str, Any], brand
     if not terms:
         return True
 
+    compact_text = _search_token(" ".join(_live_searchable_values(raw, row)))
+    return any(term in compact_text for term in terms)
+
+
+def _is_thai_market_live_item(raw: dict[str, Any], row: dict[str, Any], brand_profile: dict[str, Any]) -> bool:
+    values = _live_searchable_values(raw, row)
+    compact_text = _search_token(" ".join(values))
+    if any(_contains_thai_character(value) for value in values):
+        return True
+    if any(term in compact_text for term in THAI_MARKET_TERMS):
+        return True
+    return any(_search_token(term) in compact_text for term in brand_profile.get("thai_search_terms", []))
+
+
+def _live_searchable_values(raw: dict[str, Any], row: dict[str, Any]) -> list[str]:
     searchable_values = [
         row.get("name", ""),
         row.get("handle", ""),
         row.get("niche_tags", ""),
         row.get("style_tags", ""),
+        row.get("location", ""),
         raw.get("text", ""),
         raw.get("desc", ""),
         raw.get("description", ""),
         raw.get("caption", ""),
+        raw.get("location", ""),
+        raw.get("country", ""),
+        raw.get("region", ""),
+        raw.get("regionCode", ""),
+        raw.get("countryCode", ""),
     ]
     author_meta = raw.get("authorMeta") or {}
     author_data = raw.get("author") or {}
@@ -255,8 +290,14 @@ def _is_brand_relevant_live_item(raw: dict[str, Any], row: dict[str, Any], brand
         [
             author_meta.get("name", ""),
             author_meta.get("nickName", ""),
+            author_meta.get("signature", ""),
+            author_meta.get("region", ""),
+            author_meta.get("regionCode", ""),
             author_data.get("name", ""),
             author_data.get("nickName", ""),
+            author_data.get("signature", ""),
+            author_data.get("region", ""),
+            author_data.get("regionCode", ""),
         ]
     )
     raw_hashtags = raw.get("hashtags") or raw.get("hashtagsList") or []
@@ -268,14 +309,16 @@ def _is_brand_relevant_live_item(raw: dict[str, Any], row: dict[str, Any], brand
                 searchable_values.append(item)
     elif isinstance(raw_hashtags, str):
         searchable_values.append(raw_hashtags)
+    return [str(value) for value in searchable_values if value]
 
-    compact_text = _search_token(" ".join(str(value) for value in searchable_values if value))
-    return any(term in compact_text for term in terms)
+
+def _contains_thai_character(value: Any) -> bool:
+    return any("\u0e00" <= character <= "\u0e7f" for character in str(value))
 
 
 def _brand_relevance_terms(brand_profile: dict[str, Any]) -> set[str]:
     values: list[str] = []
-    for key in ["category", "keywords", "content_pillars"]:
+    for key in ["category", "keywords", "content_pillars", "thai_search_terms"]:
         raw_value = brand_profile.get(key, [])
         if isinstance(raw_value, str):
             values.append(raw_value)
@@ -288,6 +331,19 @@ def _brand_relevance_terms(brand_profile: dict[str, Any]) -> set[str]:
     if terms & cafe_terms or "cafe" in terms:
         terms |= {"cafe", "coffee", "คาเฟ่", "croissant", "dessert", "bakery", "brunch"}
     return terms
+
+
+def _infer_live_location(raw: dict[str, Any], row_without_location: dict[str, Any]) -> str:
+    explicit_location = raw.get("location") or raw.get("country") or raw.get("region") or raw.get("countryCode")
+    if explicit_location:
+        text = str(explicit_location).strip()
+        compact = _search_token(text)
+        if compact in {"th", "tha", "thai", "thailand", "bangkok", "bkk"}:
+            return "Thailand"
+        return text
+    if _is_thai_market_live_item(raw, row_without_location | {"location": ""}, {}):
+        return "Thailand"
+    return "unknown"
 
 
 def _normalize_tiktok_profile_url(url: Any) -> str:
@@ -396,13 +452,13 @@ def normalize_apify_profile(raw: dict[str, Any]) -> dict[str, Any]:
         or "unknown"
     )
     profile_url = explicit_profile_url or f"https://www.tiktok.com/@{normalized_handle}"
-    return {
+    profile = {
         "name": author.get("nickName") or raw.get("name") or normalized_handle,
         "handle": f"@{normalized_handle}",
         "profile_url": profile_url,
         "niche_tags": raw.get("niche_tags") or _tags_from_apify_item(raw),
         "style_tags": raw.get("style_tags") or "live|apify",
-        "location": raw.get("location", "Thailand"),
+        "location": "unknown",
         "followers": _coerce_int(followers),
         "avg_views": _coerce_int(raw.get("playCount") or raw.get("avg_views")),
         "engagement_rate": _estimated_engagement_rate(raw),
@@ -412,6 +468,8 @@ def normalize_apify_profile(raw: dict[str, Any]) -> dict[str, Any]:
         "cost_tier": raw.get("cost_tier", "unknown"),
         "brand_safety_notes": raw.get("brand_safety_notes", "Live data requires manual review"),
     }
+    profile["location"] = _infer_live_location(raw, profile)
+    return profile
 
 
 def _tags_from_apify_item(raw: dict[str, Any]) -> str:

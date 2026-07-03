@@ -103,7 +103,7 @@ def test_fetch_apify_kols_calls_actor_and_normalizes_items(monkeypatch):
             "authorMeta": {"name": "livecafe", "nickName": "Live Cafe", "fans": "12,345"},
             "webVideoUrl": "https://www.tiktok.com/@livecafe/video/123",
             "playCount": "4,321",
-            "hashtags": [{"name": "cafe"}, {"name": "coffee"}],
+            "hashtags": [{"name": "cafe"}, {"name": "coffee"}, {"name": "bangkokcafe"}],
         }
     ]
     monkeypatch.delenv("APIFY_INPUT_JSON", raising=False)
@@ -119,7 +119,7 @@ def test_fetch_apify_kols_calls_actor_and_normalizes_items(monkeypatch):
     assert len(df) == 1
     assert df.iloc[0]["handle"] == "@livecafe"
     assert df.iloc[0]["profile_url"] == "https://www.tiktok.com/@livecafe"
-    assert df.iloc[0]["niche_tags"] == "cafe|coffee"
+    assert df.iloc[0]["niche_tags"] == "cafe|coffee|bangkokcafe"
     assert df.iloc[0]["followers"] == 12345
     assert FakeApifyClient.calls["token"] == "token-for-test"
     assert FakeApifyClient.calls["actor_id"] == "clockworks/free-tiktok-scraper"
@@ -156,6 +156,34 @@ def test_fetch_apify_kols_filters_live_profiles_without_brand_relevance(monkeypa
     df = fetch_apify_kols({"keywords": ["cafe", "coffee"], "content_pillars": ["desserts and bakery"]}, token="token-for-test", client_factory=FakeApifyClient)
 
     assert df["handle"].tolist() == ["@cafebkk"]
+
+
+def test_fetch_apify_kols_filters_foreign_profiles_without_thai_market_signal(monkeypatch):
+    FakeApifyClient.calls = {}
+    FakeApifyClient.items = [
+        {
+            "authorMeta": {"name": "seoulcafes", "nickName": "Seoul Cafes", "fans": 80000},
+            "webVideoUrl": "https://www.tiktok.com/@seoulcafes/video/123",
+            "hashtags": [{"name": "cafe"}, {"name": "coffee"}],
+            "text": "Best cafe in Seoul for specialty coffee",
+        },
+        {
+            "authorMeta": {"name": "thaicafereview", "nickName": "Thai Cafe Review", "fans": 50000},
+            "webVideoUrl": "https://www.tiktok.com/@thaicafereview/video/123",
+            "hashtags": [{"name": "cafe"}, {"name": "bangkokcafe"}],
+            "text": "รีวิวคาเฟ่กรุงเทพ specialty coffee",
+        },
+    ]
+    monkeypatch.delenv("APIFY_INPUT_JSON", raising=False)
+
+    df = fetch_apify_kols(
+        {"keywords": ["cafe", "coffee"], "locations": ["Bangkok"], "thai_search_terms": ["รีวิวคาเฟ่"]},
+        token="token-for-test",
+        client_factory=FakeApifyClient,
+    )
+
+    assert df["handle"].tolist() == ["@thaicafereview"]
+    assert df.iloc[0]["location"] == "Thailand"
 
 
 def test_fetch_apify_kols_strips_accidental_token_quotes(monkeypatch):
@@ -208,6 +236,19 @@ def test_video_url_normalizes_to_creator_profile_url():
     assert profile["handle"] == "@creator"
     assert profile["profile_url"] == "https://www.tiktok.com/@creator"
     assert profile["demographics_source"] == "live_unverified"
+
+
+def test_normalization_does_not_default_live_location_to_thailand_without_signal():
+    profile = normalize_apify_profile(
+        {
+            "authorMeta": {"name": "seoulcafes"},
+            "webVideoUrl": "https://www.tiktok.com/@seoulcafes/video/123",
+            "hashtags": [{"name": "cafe"}],
+            "text": "Best cafe in Seoul",
+        }
+    )
+
+    assert profile["location"] == "unknown"
 
 
 def test_normalization_estimates_engagement_rate_from_live_counts():

@@ -75,6 +75,8 @@ if "profile" in st.session_state and "ranked" in st.session_state:
 
     for warning in profile.get("source_warnings", []):
         st.warning(warning)
+    for warning in profile.get("analysis_warnings", []):
+        st.warning(warning)
     for warning in st.session_state.get("kol_warnings", []):
         st.info(warning)
 

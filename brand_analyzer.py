@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
+import os
 import re
 from typing import Any
 
+from openai import OpenAI
 import requests
 from bs4 import BeautifulSoup
 
@@ -90,6 +93,71 @@ def analyze_brand_text(text: str) -> dict[str, Any]:
     if not normalized_text:
         return _blank_profile()
 
+    api_key = _clean_openai_key(os.getenv("OPENAI_API_KEY"))
+    if api_key and not _is_placeholder_openai_key(api_key):
+        try:
+            return _analyze_brand_text_openai(normalized_text, api_key)
+        except Exception as exc:
+            profile = _analyze_brand_text_heuristic(normalized_text)
+            profile["analysis_warnings"] = [f"OpenAI brand extraction failed: {exc}"]
+            return profile
+
+    return _analyze_brand_text_heuristic(normalized_text)
+
+
+def _analyze_brand_text_openai(text: str, api_key: str) -> dict[str, Any]:
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    client = OpenAI(api_key=api_key)
+    response = client.chat.completions.create(
+        model=model,
+        temperature=0.1,
+        response_format={"type": "json_object"},
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Extract a concise influencer-matching brand profile as JSON only. "
+                    "Use snake_case strings. Include Thai market search terms when relevant."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Return JSON with keys: category, keywords, target_audience, tone, locations, "
+                    "content_pillars, thai_search_terms, summary. Brand text:\n"
+                    f"{text[:TEXT_CAP]}"
+                ),
+            },
+        ],
+    )
+    content = response.choices[0].message.content or "{}"
+    parsed = json.loads(content)
+    return _validated_openai_profile(parsed)
+
+
+def _validated_openai_profile(parsed: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(parsed, dict):
+        raise ValueError("OpenAI response was not a JSON object")
+    category = _string_value(parsed.get("category"), "unknown")
+    profile = {
+        "category": category,
+        "keywords": _string_list(parsed.get("keywords")),
+        "target_audience": _string_list(parsed.get("target_audience")),
+        "tone": _string_list(parsed.get("tone")) or ["general"],
+        "locations": _string_list(parsed.get("locations")),
+        "content_pillars": _string_list(parsed.get("content_pillars")),
+        "thai_search_terms": _string_list(parsed.get("thai_search_terms")),
+        "analysis_mode": "openai",
+        "analysis_warnings": [],
+        "summary": _string_value(parsed.get("summary"), "Brand text was analyzed with OpenAI."),
+    }
+    if not profile["content_pillars"]:
+        profile["content_pillars"] = _detect_content_pillars(profile["keywords"], profile["tone"], profile["locations"])
+    return profile
+
+
+def _analyze_brand_text_heuristic(normalized_text: str) -> dict[str, Any]:
+
     keywords = _match_patterns(normalized_text, KEYWORD_PATTERNS)
     audience = _match_patterns(normalized_text, AUDIENCE_PATTERNS)
     tone = _match_patterns(normalized_text, TONE_PATTERNS) or ["general"]
@@ -104,7 +172,9 @@ def analyze_brand_text(text: str) -> dict[str, Any]:
         "tone": tone,
         "locations": locations,
         "content_pillars": content_pillars,
+        "thai_search_terms": _thai_search_terms(keywords, locations),
         "analysis_mode": "heuristic",
+        "analysis_warnings": [],
         "summary": _build_summary(category, keywords, audience, locations),
     }
 
@@ -121,9 +191,56 @@ def _blank_profile() -> dict[str, Any]:
         "tone": ["general"],
         "locations": [],
         "content_pillars": [],
+        "thai_search_terms": [],
         "analysis_mode": "heuristic",
+        "analysis_warnings": [],
         "summary": "No usable brand text was provided.",
     }
+
+
+def _clean_openai_key(value: Any) -> str:
+    if value is None:
+        return ""
+    token = str(value).strip()
+    while len(token) >= 2 and token[0] == token[-1] and token[0] in {"'", '"'}:
+        token = token[1:-1].strip()
+    return token
+
+
+def _is_placeholder_openai_key(value: str) -> bool:
+    return value.lower() in {
+        "your-openai-key",
+        "paste-your-real-openai-api-key-here",
+        "paste-your-real-openai-api-token-here",
+    }
+
+
+def _string_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _string_value(value: Any, fallback: str) -> str:
+    text = str(value).strip() if value is not None else ""
+    return text or fallback
+
+
+def _thai_search_terms(keywords: list[str], locations: list[str]) -> list[str]:
+    terms: list[str] = []
+    if any(keyword in keywords for keyword in ("cafe", "coffee", "dessert", "brunch")):
+        terms.extend(["รีวิวคาเฟ่", "คาเฟ่"])
+        if "Bangkok" in locations:
+            terms.extend(["คาเฟ่กรุงเทพ", "bangkokcafe", "cafehoppingbkk"])
+        if "Ari" in locations:
+            terms.extend(["คาเฟ่อารีย์"])
+    deduped: list[str] = []
+    for term in terms:
+        if term not in deduped:
+            deduped.append(term)
+    return deduped
 
 
 def _match_patterns(text: str, patterns: dict[str, tuple[str, ...]]) -> list[str]:
