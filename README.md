@@ -68,3 +68,11 @@ Expected app behavior:
 - Analyze and Match KOLs returns at least five TikTok profiles.
 - The detailed table includes score breakdown columns.
 - CSV and Markdown downloads are available.
+
+## Loom Talking Points
+
+- Problem: influencer shortlisting is slow when teams manually inspect client pages and TikTok profiles.
+- Prototype: converts client content into a structured brand profile and ranks KOLs using transparent weighted scoring.
+- Reliability: works without API keys, avoids fragile login-wall scraping, and includes optional OpenAI/Apify upgrade paths.
+- Business value: reduces first-pass KOL discovery time and gives the marketing team a consistent shortlist with reasons.
+- Future enhancements: verified live TikTok collection, campaign performance feedback loop, richer brand safety checks, CRM integration, and human approval workflows.
