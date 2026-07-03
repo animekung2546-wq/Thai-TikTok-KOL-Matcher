@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import pandas as pd
 
@@ -30,14 +31,42 @@ def load_kols(use_apify: bool = False) -> tuple[pd.DataFrame, list[str]]:
     return load_sample_kols(), warnings
 
 
+def _normalize_tiktok_profile_url(url: Any) -> str:
+    if not url:
+        return ""
+    text = str(url).strip()
+    if not text:
+        return ""
+
+    parsed = urlsplit(text)
+    path_parts = [part for part in parsed.path.split("/") if part]
+    handle_part = next((part for part in path_parts if part.startswith("@")), "")
+    if not handle_part:
+        return ""
+    return urlunsplit((parsed.scheme or "https", parsed.netloc or "www.tiktok.com", f"/{handle_part}", "", ""))
+
+
 def normalize_apify_profile(raw: dict[str, Any]) -> dict[str, Any]:
-    author = raw.get("authorMeta") or raw.get("author") or {}
+    author_meta = raw.get("authorMeta") or {}
+    author_data = raw.get("author") or {}
+    author = author_meta or author_data
     handle = author.get("name") or raw.get("username") or raw.get("handle") or "unknown"
+    normalized_handle = str(handle).lstrip("@")
     followers = author.get("fans") or author.get("followers") or raw.get("followers") or 0
+    profile_url = (
+        _normalize_tiktok_profile_url(author_meta.get("profileUrl"))
+        or _normalize_tiktok_profile_url(author_meta.get("profile_url"))
+        or _normalize_tiktok_profile_url(author_data.get("profileUrl"))
+        or _normalize_tiktok_profile_url(author_data.get("profile_url"))
+        or _normalize_tiktok_profile_url(raw.get("profileUrl"))
+        or _normalize_tiktok_profile_url(raw.get("profile_url"))
+        or _normalize_tiktok_profile_url(raw.get("webVideoUrl"))
+        or f"https://www.tiktok.com/@{normalized_handle}"
+    )
     return {
         "name": author.get("nickName") or raw.get("name") or handle,
-        "handle": f"@{str(handle).lstrip('@')}",
-        "profile_url": raw.get("webVideoUrl") or f"https://www.tiktok.com/@{str(handle).lstrip('@')}",
+        "handle": f"@{normalized_handle}",
+        "profile_url": profile_url,
         "niche_tags": raw.get("niche_tags", ""),
         "style_tags": raw.get("style_tags", ""),
         "location": raw.get("location", "Thailand"),
