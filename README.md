@@ -30,7 +30,7 @@ Set environment variables in your shell:
 
 ```powershell
 $env:OPENAI_API_KEY="your-openai-key"
-$env:APIFY_TOKEN="your-apify-token"
+$env:APIFY_TOKEN="paste-your-real-apify-api-token-here"
 ```
 
 The app works without these keys. The current brand analyzer uses deterministic heuristics. `APIFY_TOKEN` enables live TikTok collection through Apify. If Apify fails or returns no usable profiles, the app falls back to sample data.
@@ -38,7 +38,7 @@ The app works without these keys. The current brand analyzer uses deterministic 
 Run with live Apify collection:
 
 ```powershell
-$env:APIFY_TOKEN="your-apify-token"
+$env:APIFY_TOKEN="paste-your-real-apify-api-token-here"
 $env:APIFY_MAX_ITEMS="20"
 streamlit run app.py
 ```
@@ -53,6 +53,14 @@ $env:APIFY_MAX_ITEMS="20"
 The default Actor input is generated from the detected brand keywords and locations. To override it completely, set `APIFY_INPUT_JSON` to a JSON object accepted by the chosen Apify Actor.
 
 Keep real API keys local and do not commit them to git.
+
+To verify the Apify token before running Streamlit:
+
+```powershell
+Invoke-RestMethod -Headers @{ Authorization = "Bearer $env:APIFY_TOKEN" } -Uri "https://api.apify.com/v2/users/me"
+```
+
+If Apify returns `User was not found or authentication token is not valid`, create or copy a fresh token from Apify Console > Settings > API & Integrations, set `APIFY_TOKEN` again in the same terminal, and restart Streamlit.
 
 ## Demo Flow for Loom
 

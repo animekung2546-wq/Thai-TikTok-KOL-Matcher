@@ -126,6 +126,16 @@ def test_fetch_apify_kols_calls_actor_and_normalizes_items(monkeypatch):
     assert FakeApifyClient.calls["list_items"]["limit"] == 5
 
 
+def test_fetch_apify_kols_strips_accidental_token_quotes(monkeypatch):
+    FakeApifyClient.calls = {}
+    FakeApifyClient.items = [{"authorMeta": {"name": "cafeth", "nickName": "Cafe TH"}}]
+    monkeypatch.delenv("APIFY_INPUT_JSON", raising=False)
+
+    fetch_apify_kols(token=' "token-for-test" ', client_factory=FakeApifyClient)
+
+    assert FakeApifyClient.calls["token"] == "token-for-test"
+
+
 def test_load_kols_with_apify_token_uses_live_fetch(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "token-for-test")
     monkeypatch.setattr("kol_data.fetch_apify_kols", lambda brand_profile=None: load_sample_kols().head(2))
@@ -134,6 +144,15 @@ def test_load_kols_with_apify_token_uses_live_fetch(monkeypatch):
 
     assert len(df) == 2
     assert warnings == ["Loaded 2 live TikTok profiles from Apify."]
+
+
+def test_load_kols_with_placeholder_apify_token_warns(monkeypatch):
+    monkeypatch.setenv("APIFY_TOKEN", "your-apify-token")
+
+    df, warnings = load_kols(use_apify=True, brand_profile={"keywords": ["cafe"]})
+
+    assert len(df) == 24
+    assert "APIFY_TOKEN still contains the placeholder value" in warnings[0]
 
 
 def test_load_kols_falls_back_when_apify_returns_empty(monkeypatch):

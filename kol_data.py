@@ -51,8 +51,15 @@ def load_kols(use_apify: bool = False, brand_profile: dict[str, Any] | None = No
     if not use_apify:
         return load_sample_kols(), warnings
 
-    if not os.getenv("APIFY_TOKEN"):
+    api_token = _clean_apify_token(os.getenv("APIFY_TOKEN"))
+    if not api_token:
         warnings.append("APIFY_TOKEN is missing, so the app is using the bundled sample KOL dataset.")
+        return load_sample_kols(), warnings
+    if _is_placeholder_apify_token(api_token):
+        warnings.append(
+            "APIFY_TOKEN still contains the placeholder value. Replace it with a real Apify API token from "
+            "Apify Console > Settings > API & Integrations."
+        )
         return load_sample_kols(), warnings
 
     try:
@@ -77,9 +84,13 @@ def fetch_apify_kols(
     max_items: int | None = None,
     client_factory: Any | None = None,
 ) -> pd.DataFrame:
-    api_token = token or os.getenv("APIFY_TOKEN")
+    api_token = _clean_apify_token(token if token is not None else os.getenv("APIFY_TOKEN"))
     if not api_token:
         raise ApifyFetchError("APIFY_TOKEN is missing")
+    if _is_placeholder_apify_token(api_token):
+        raise ApifyFetchError(
+            "APIFY_TOKEN still contains the placeholder value. Replace it with a real Apify API token."
+        )
 
     actor_name = actor_id or os.getenv("APIFY_ACTOR_ID") or DEFAULT_APIFY_ACTOR_ID
     item_limit = max_items or _env_int("APIFY_MAX_ITEMS", DEFAULT_APIFY_MAX_ITEMS)
@@ -100,7 +111,13 @@ def fetch_apify_kols(
     except ApifyFetchError:
         raise
     except Exception as exc:
-        raise ApifyFetchError(str(exc)) from exc
+        error_message = str(exc)
+        if "authentication token" in error_message.lower() or "user was not found" in error_message.lower():
+            error_message = (
+                "Apify rejected APIFY_TOKEN. Copy a valid API token from Apify Console > Settings > "
+                "API & Integrations, set APIFY_TOKEN again, then restart Streamlit."
+            )
+        raise ApifyFetchError(error_message) from exc
 
     rows = [normalize_apify_profile(item) for item in raw_items[:item_limit]]
     rows = [row for row in rows if row["handle"] != "@unknown" and row["profile_url"].startswith("https://www.tiktok.com/@")]
@@ -156,6 +173,20 @@ def _env_int(name: str, default: int) -> int:
         return max(1, int(value))
     except ValueError:
         return default
+
+
+def _clean_apify_token(value: Any) -> str:
+    if value is None:
+        return ""
+    token = str(value).strip()
+    while len(token) >= 2 and token[0] == token[-1] and token[0] in {"'", '"'}:
+        token = token[1:-1].strip()
+    return token
+
+
+def _is_placeholder_apify_token(value: str) -> bool:
+    normalized = value.strip().lower()
+    return normalized in {"your-apify-token", "your_api_token", "my-apify-token", "my_apify_token"}
 
 
 def _read_field(value: Any, field_name: str) -> Any:
