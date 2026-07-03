@@ -89,7 +89,9 @@ def test_build_apify_actor_input_uses_brand_hashtags():
         max_items=12,
     )
 
-    assert actor_input["hashtags"] == ["cafe", "coffee", "dessert", "bangkok", "specialtycoffee"]
+    assert "bangkok" not in actor_input["hashtags"]
+    assert actor_input["hashtags"][:3] == ["cafe", "coffee", "dessert"]
+    assert {"bangkokcafe", "cafehoppingbkk"} <= set(actor_input["hashtags"])
     assert actor_input["resultsPerPage"] == 12
     assert actor_input["commentsPerPost"] == 0
 
@@ -122,8 +124,38 @@ def test_fetch_apify_kols_calls_actor_and_normalizes_items(monkeypatch):
     assert FakeApifyClient.calls["token"] == "token-for-test"
     assert FakeApifyClient.calls["actor_id"] == "clockworks/free-tiktok-scraper"
     assert FakeApifyClient.calls["dataset_id"] == "dataset-1"
-    assert FakeApifyClient.calls["call"]["run_input"]["hashtags"] == ["cafe", "coffee", "bangkok"]
+    assert FakeApifyClient.calls["call"]["run_input"]["hashtags"][:2] == ["cafe", "coffee"]
+    assert "bangkok" not in FakeApifyClient.calls["call"]["run_input"]["hashtags"]
     assert FakeApifyClient.calls["list_items"]["limit"] == 5
+
+
+def test_fetch_apify_kols_filters_live_profiles_without_brand_relevance(monkeypatch):
+    FakeApifyClient.calls = {}
+    FakeApifyClient.items = [
+        {
+            "authorMeta": {"name": "bangkokrooftops", "nickName": "Bangkok Rooftops", "fans": 135500},
+            "webVideoUrl": "https://www.tiktok.com/@bangkokrooftops/video/123",
+            "hashtags": [{"name": "travel"}, {"name": "rooftop"}],
+            "text": "Best skyline bars in Bangkok",
+        },
+        {
+            "authorMeta": {"name": "mrmassagez", "nickName": "Black Massage", "fans": 96600},
+            "webVideoUrl": "https://www.tiktok.com/@mr.massagez/video/123",
+            "hashtags": [{"name": "massage"}, {"name": "wellness"}],
+            "text": "Massage review",
+        },
+        {
+            "authorMeta": {"name": "cafebkk", "nickName": "Cafe BKK", "fans": 45000},
+            "webVideoUrl": "https://www.tiktok.com/@cafebkk/video/123",
+            "hashtags": [{"name": "cafe"}, {"name": "coffee"}],
+            "text": "Ari specialty coffee and croissant review",
+        },
+    ]
+    monkeypatch.delenv("APIFY_INPUT_JSON", raising=False)
+
+    df = fetch_apify_kols({"keywords": ["cafe", "coffee"], "content_pillars": ["desserts and bakery"]}, token="token-for-test", client_factory=FakeApifyClient)
+
+    assert df["handle"].tolist() == ["@cafebkk"]
 
 
 def test_fetch_apify_kols_strips_accidental_token_quotes(monkeypatch):
@@ -176,6 +208,22 @@ def test_video_url_normalizes_to_creator_profile_url():
     assert profile["handle"] == "@creator"
     assert profile["profile_url"] == "https://www.tiktok.com/@creator"
     assert profile["demographics_source"] == "live_unverified"
+
+
+def test_normalization_estimates_engagement_rate_from_live_counts():
+    profile = normalize_apify_profile(
+        {
+            "authorMeta": {"name": "creator"},
+            "webVideoUrl": "https://www.tiktok.com/@creator/video/123",
+            "playCount": 10000,
+            "diggCount": 700,
+            "commentCount": 80,
+            "shareCount": 20,
+        }
+    )
+
+    assert profile["avg_views"] == 10000
+    assert profile["engagement_rate"] == 8.0
 
 
 def test_video_url_does_not_override_explicit_handle():

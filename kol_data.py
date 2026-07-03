@@ -119,8 +119,14 @@ def fetch_apify_kols(
             )
         raise ApifyFetchError(error_message) from exc
 
-    rows = [normalize_apify_profile(item) for item in raw_items[:item_limit]]
-    rows = [row for row in rows if row["handle"] != "@unknown" and row["profile_url"].startswith("https://www.tiktok.com/@")]
+    rows = []
+    for item in raw_items[:item_limit]:
+        row = normalize_apify_profile(item)
+        if row["handle"] == "@unknown" or not row["profile_url"].startswith("https://www.tiktok.com/@"):
+            continue
+        if not _is_brand_relevant_live_item(item, row, brand_profile or {}):
+            continue
+        rows.append(row)
     return pd.DataFrame(rows, columns=REQUIRED_COLUMNS)
 
 
@@ -150,7 +156,7 @@ def build_apify_actor_input(brand_profile: dict[str, Any], max_items: int) -> di
 
 def _hashtags_from_brand_profile(brand_profile: dict[str, Any]) -> list[str]:
     values: list[str] = []
-    for key in ["keywords", "locations", "content_pillars"]:
+    for key in ["keywords", "content_pillars"]:
         raw_value = brand_profile.get(key, [])
         if isinstance(raw_value, str):
             values.append(raw_value)
@@ -159,10 +165,31 @@ def _hashtags_from_brand_profile(brand_profile: dict[str, Any]) -> list[str]:
 
     hashtags: list[str] = []
     for value in values:
-        hashtag = "".join(character.lower() for character in value if character.isalnum())
+        hashtag = _search_token(value)
         if hashtag and hashtag not in hashtags:
             hashtags.append(hashtag)
-    return (hashtags or ["cafe"])[:5]
+
+    for expansion in _intent_hashtag_expansions(brand_profile, hashtags):
+        if expansion not in hashtags:
+            hashtags.append(expansion)
+    return (hashtags or ["cafe"])[:8]
+
+
+def _intent_hashtag_expansions(brand_profile: dict[str, Any], hashtags: list[str]) -> list[str]:
+    terms = set(hashtags)
+    category = _search_token(brand_profile.get("category", ""))
+    if category:
+        terms.add(category)
+    locations = {_search_token(location) for location in brand_profile.get("locations", [])}
+    is_bangkok_brand = bool({"bangkok", "bkk"} & locations)
+    cafe_terms = {"cafe", "coffee", "dessert", "bakery", "brunch", "croissant", "specialtycoffee"}
+    if terms & cafe_terms or "cafe" in category:
+        expansions = []
+        if is_bangkok_brand:
+            expansions.extend(["bangkokcafe", "bkkcafe", "cafehoppingbkk"])
+        expansions.extend(["cafehopping", "cafereview", "คาเฟ่", "รีวิวคาเฟ่"])
+        return expansions
+    return []
 
 
 def _env_int(name: str, default: int) -> int:
@@ -173,6 +200,10 @@ def _env_int(name: str, default: int) -> int:
         return max(1, int(value))
     except ValueError:
         return default
+
+
+def _search_token(value: Any) -> str:
+    return "".join(character.lower() for character in str(value) if character.isalnum())
 
 
 def _clean_apify_token(value: Any) -> str:
@@ -201,6 +232,62 @@ def _dataset_items(items_page: Any) -> list[dict[str, Any]]:
     if isinstance(items_page, dict):
         return list(items_page.get("items", []))
     return list(getattr(items_page, "items", []) or [])
+
+
+def _is_brand_relevant_live_item(raw: dict[str, Any], row: dict[str, Any], brand_profile: dict[str, Any]) -> bool:
+    terms = _brand_relevance_terms(brand_profile)
+    if not terms:
+        return True
+
+    searchable_values = [
+        row.get("name", ""),
+        row.get("handle", ""),
+        row.get("niche_tags", ""),
+        row.get("style_tags", ""),
+        raw.get("text", ""),
+        raw.get("desc", ""),
+        raw.get("description", ""),
+        raw.get("caption", ""),
+    ]
+    author_meta = raw.get("authorMeta") or {}
+    author_data = raw.get("author") or {}
+    searchable_values.extend(
+        [
+            author_meta.get("name", ""),
+            author_meta.get("nickName", ""),
+            author_data.get("name", ""),
+            author_data.get("nickName", ""),
+        ]
+    )
+    raw_hashtags = raw.get("hashtags") or raw.get("hashtagsList") or []
+    if isinstance(raw_hashtags, list):
+        for item in raw_hashtags:
+            if isinstance(item, dict):
+                searchable_values.append(item.get("name") or item.get("title") or "")
+            else:
+                searchable_values.append(item)
+    elif isinstance(raw_hashtags, str):
+        searchable_values.append(raw_hashtags)
+
+    compact_text = _search_token(" ".join(str(value) for value in searchable_values if value))
+    return any(term in compact_text for term in terms)
+
+
+def _brand_relevance_terms(brand_profile: dict[str, Any]) -> set[str]:
+    values: list[str] = []
+    for key in ["category", "keywords", "content_pillars"]:
+        raw_value = brand_profile.get(key, [])
+        if isinstance(raw_value, str):
+            values.append(raw_value)
+        else:
+            values.extend(str(value) for value in raw_value)
+
+    terms = {_search_token(value) for value in values}
+    terms = {term for term in terms if len(term) >= 3 and term not in {"thai", "bkk", "bangkok"}}
+    cafe_terms = {"cafe", "coffee", "dessert", "bakery", "brunch", "croissant", "specialtycoffee"}
+    if terms & cafe_terms or "cafe" in terms:
+        terms |= {"cafe", "coffee", "คาเฟ่", "croissant", "dessert", "bakery", "brunch"}
+    return terms
 
 
 def _normalize_tiktok_profile_url(url: Any) -> str:
@@ -267,6 +354,20 @@ def _coerce_float(value: Any) -> float:
     return float(text)
 
 
+def _estimated_engagement_rate(raw: dict[str, Any]) -> float:
+    if raw.get("engagement_rate") not in (None, ""):
+        return _coerce_float(raw.get("engagement_rate"))
+    views = _coerce_int(raw.get("playCount") or raw.get("avg_views"))
+    if views <= 0:
+        return 0.0
+    interactions = (
+        _coerce_int(raw.get("diggCount") or raw.get("likeCount"))
+        + _coerce_int(raw.get("commentCount"))
+        + _coerce_int(raw.get("shareCount"))
+    )
+    return round((interactions / views) * 100, 2)
+
+
 def normalize_apify_profile(raw: dict[str, Any]) -> dict[str, Any]:
     author_meta = raw.get("authorMeta") or {}
     author_data = raw.get("author") or {}
@@ -304,7 +405,7 @@ def normalize_apify_profile(raw: dict[str, Any]) -> dict[str, Any]:
         "location": raw.get("location", "Thailand"),
         "followers": _coerce_int(followers),
         "avg_views": _coerce_int(raw.get("playCount") or raw.get("avg_views")),
-        "engagement_rate": _coerce_float(raw.get("engagement_rate")),
+        "engagement_rate": _estimated_engagement_rate(raw),
         "audience_age": raw.get("audience_age", "unknown"),
         "audience_gender_skew": raw.get("audience_gender_skew", "unknown"),
         "demographics_source": raw.get("demographics_source") or "live_unverified",
