@@ -9,17 +9,6 @@ from bs4 import BeautifulSoup
 
 TEXT_CAP = 12000
 
-BLANK_PROFILE: dict[str, Any] = {
-    "category": "unknown",
-    "keywords": [],
-    "target_audience": [],
-    "tone": ["general"],
-    "locations": [],
-    "content_pillars": [],
-    "analysis_mode": "heuristic",
-    "summary": "No usable brand text was provided.",
-}
-
 KEYWORD_PATTERNS: dict[str, tuple[str, ...]] = {
     "coffee": ("coffee", "espresso", "latte", "cappuccino", "americano"),
     "dessert": ("dessert", "desserts", "cake", "cakes", "croissant", "croissants", "pastry", "pastries"),
@@ -69,7 +58,7 @@ def fetch_public_text(url: str, timeout: int = 8) -> tuple[str, str | None]:
             timeout=timeout,
         )
         response.raise_for_status()
-    except Exception as exc:
+    except requests.RequestException as exc:
         return "", f"Could not fetch {url}: {exc}"
 
     soup = BeautifulSoup(response.text, "html.parser")
@@ -99,7 +88,7 @@ def analyze_brand(website_url: str = "", facebook_url: str = "", pasted_text: st
 def analyze_brand_text(text: str) -> dict[str, Any]:
     normalized_text = _collapse_whitespace(text)
     if not normalized_text:
-        return BLANK_PROFILE.copy()
+        return _blank_profile()
 
     keywords = _match_patterns(normalized_text, KEYWORD_PATTERNS)
     audience = _match_patterns(normalized_text, AUDIENCE_PATTERNS)
@@ -122,6 +111,19 @@ def analyze_brand_text(text: str) -> dict[str, Any]:
 
 def _collapse_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _blank_profile() -> dict[str, Any]:
+    return {
+        "category": "unknown",
+        "keywords": [],
+        "target_audience": [],
+        "tone": ["general"],
+        "locations": [],
+        "content_pillars": [],
+        "analysis_mode": "heuristic",
+        "summary": "No usable brand text was provided.",
+    }
 
 
 def _match_patterns(text: str, patterns: dict[str, tuple[str, ...]]) -> list[str]:
