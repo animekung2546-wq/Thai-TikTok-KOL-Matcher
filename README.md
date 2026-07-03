@@ -54,3 +54,17 @@ Keep real API keys local and do not commit them to git.
 - Sample demographics are estimates for prototype demonstration.
 - Final KOL selection should include human marketing review.
 - Match scores support decision-making; they should not be treated as the only authority.
+
+## Local Verification
+
+```powershell
+pytest -v
+streamlit run app.py
+```
+
+Expected app behavior:
+
+- The Thai Cafe Demo loads sample brand text.
+- Analyze and Match KOLs returns at least five TikTok profiles.
+- The detailed table includes score breakdown columns.
+- CSV and Markdown downloads are available.
