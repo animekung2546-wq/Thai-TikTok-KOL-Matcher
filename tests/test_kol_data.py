@@ -16,6 +16,7 @@ REQUIRED_COLUMNS = [
     "engagement_rate",
     "audience_age",
     "audience_gender_skew",
+    "demographics_source",
     "cost_tier",
     "brand_safety_notes",
 ]
@@ -26,6 +27,7 @@ def test_sample_csv_has_expected_rows_and_required_columns():
 
     assert len(df) == 24
     assert list(df.columns) == REQUIRED_COLUMNS
+    assert set(df["demographics_source"]) == {"sample_estimate"}
 
 
 def test_load_kols_with_apify_missing_token_warns(monkeypatch):
@@ -58,6 +60,7 @@ def test_video_url_normalizes_to_creator_profile_url():
 
     assert profile["handle"] == "@creator"
     assert profile["profile_url"] == "https://www.tiktok.com/@creator"
+    assert profile["demographics_source"] == "live_unverified"
 
 
 def test_video_url_does_not_override_explicit_handle():
@@ -65,6 +68,17 @@ def test_video_url_does_not_override_explicit_handle():
         {
             "authorMeta": {"uniqueId": "creator"},
             "webVideoUrl": "https://www.tiktok.com/@other/video/123",
+        }
+    )
+
+    assert profile["handle"] == "@creator"
+    assert profile["profile_url"] == "https://www.tiktok.com/@creator"
+
+
+def test_profile_url_normalizes_mixed_case_tiktok_host():
+    profile = normalize_apify_profile(
+        {
+            "profileUrl": "TikTok.com/@creator?lang=en",
         }
     )
 
@@ -107,6 +121,22 @@ def test_normalization_output_has_same_schema_keys_as_sample_row():
     )
 
     assert set(profile) == sample_keys
+
+
+def test_normalization_coerces_numeric_strings_and_preserves_demographics_source():
+    profile = normalize_apify_profile(
+        {
+            "authorMeta": {"uniqueId": "creator", "fans": "1,234"},
+            "playCount": "5,678",
+            "engagement_rate": "5.6",
+            "demographics_source": "manual_estimate",
+        }
+    )
+
+    assert profile["followers"] == 1234
+    assert profile["avg_views"] == 5678
+    assert profile["engagement_rate"] == 5.6
+    assert profile["demographics_source"] == "manual_estimate"
 
 
 def test_missing_csv_columns_raises_value_error(tmp_path):

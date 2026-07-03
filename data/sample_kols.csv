@@ -1,25 +1,25 @@
-name,handle,profile_url,niche_tags,style_tags,location,followers,avg_views,engagement_rate,audience_age,audience_gender_skew,cost_tier,brand_safety_notes
-May Cafe Hopping,@maycafehop,https://www.tiktok.com/@maycafehop,"cafe|coffee|dessert|lifestyle","aesthetic|cozy|review",Bangkok,185000,52000,5.8,18-34,female_skew,medium,Generally brand-safe food and cafe reviews
-Kin Rai Dee,@kinraidee,https://www.tiktok.com/@kinraidee,"food|restaurant|street_food|dessert","review|casual|value",Bangkok,420000,110000,4.9,18-34,mixed,high,Occasional spicy street food humor
-BKK Brunch Club,@bkkbrunchclub,https://www.tiktok.com/@bkkbrunchclub,"brunch|cafe|coffee|restaurant","premium|aesthetic|review",Bangkok,98000,31000,6.4,22-38,female_skew,medium,Polished restaurant content
-Ari Eats,@arieats,https://www.tiktok.com/@arieats,"cafe|restaurant|dessert|local","cozy|review|neighborhood",Bangkok,76000,22000,7.1,18-34,mixed,low,Local Bangkok neighborhood focus
-Thai Dessert Diary,@thaidessertdiary,https://www.tiktok.com/@thaidessertdiary,"dessert|bakery|cafe|food","aesthetic|sweet|review",Bangkok,132000,43000,6.2,18-30,female_skew,medium,Strong dessert alignment
-Coffee Nerd TH,@coffeenerdth,https://www.tiktok.com/@coffeenerdth,"coffee|cafe|specialty_coffee","educational|premium|review",Bangkok,88000,26000,5.5,22-40,mixed,medium,Specialty coffee content
-Siam Food Finds,@siamfoodfinds,https://www.tiktok.com/@siamfoodfinds,"food|restaurant|cafe|mall","review|trendy|casual",Bangkok,245000,68000,4.7,18-34,mixed,high,Broad food discovery
-Cozy Table TH,@cozytableth,https://www.tiktok.com/@cozytableth,"cafe|brunch|dessert","cozy|aesthetic|lifestyle",Bangkok,54000,18000,7.8,18-32,female_skew,low,Micro KOL with strong fit
-Hungry Office BKK,@hungryofficebkk,https://www.tiktok.com/@hungryofficebkk,"food|lunch|cafe|restaurant","office|value|review",Bangkok,117000,36000,5.2,22-38,mixed,medium,Good office worker audience
-Nomad Bites TH,@nomadbitesth,https://www.tiktok.com/@nomadbitesth,"travel|food|cafe","tourist|casual|review",Bangkok,156000,41000,4.5,20-36,mixed,medium,Travel-heavy audience
-Chiang Mai Cafe Map,@cmcafemap,https://www.tiktok.com/@cmcafemap,"cafe|coffee|dessert|travel","cozy|aesthetic|review",Chiang Mai,93000,27000,6.0,18-34,female_skew,medium,Best for Chiang Mai campaigns
-Phuket Food Weekend,@phuketfoodweekend,https://www.tiktok.com/@phuketfoodweekend,"food|restaurant|travel|cafe","tourist|review|casual",Phuket,81000,24000,5.4,20-40,mixed,medium,Best for Phuket campaigns
-Beauty With Bow,@beautywithbow,https://www.tiktok.com/@beautywithbow,"beauty|skincare|lifestyle","premium|tutorial|review",Bangkok,310000,82000,4.8,18-34,female_skew,high,Beauty-first creator
-Fit Thai Daily,@fitthaidaily,https://www.tiktok.com/@fitthaidaily,"fitness|health|meal_prep","educational|routine|wellness",Bangkok,205000,57000,5.1,18-35,mixed,high,Fitness-first creator
-Campus Eats TH,@campuseatsth,https://www.tiktok.com/@campuseatsth,"food|cafe|dessert|student","value|casual|review",Bangkok,67000,21000,7.4,16-24,mixed,low,Strong student audience
-Family Food Trip,@familyfoodtrip,https://www.tiktok.com/@familyfoodtrip,"food|restaurant|family|cafe","family_friendly|review|weekend",Bangkok,143000,38000,5.0,25-44,female_skew,medium,Family audience
-Minimal Cafe Lens,@minimalcafelens,https://www.tiktok.com/@minimalcafelens,"cafe|coffee|dessert|photography","minimal|aesthetic|cozy",Bangkok,59000,20000,8.1,18-30,female_skew,low,Highly visual cafe content
-Night Market Guy,@nightmarketguy,https://www.tiktok.com/@nightmarketguy,"street_food|night_market|food","casual|humor|value",Bangkok,390000,125000,4.3,18-34,mixed,high,Night market focus
-Pet Friendly Places,@petfriendlyplaces,https://www.tiktok.com/@petfriendlyplaces,"pet|cafe|lifestyle","family_friendly|cozy|review",Bangkok,73000,19000,6.7,22-40,female_skew,low,Good for pet-friendly venues
-Vegan Bangkok Guide,@veganbangkokguide,https://www.tiktok.com/@veganbangkokguide,"vegan|restaurant|cafe|health","educational|review|niche",Bangkok,48000,14000,7.0,20-38,mixed,low,Niche vegan audience
-Luxury Plates TH,@luxuryplatesth,https://www.tiktok.com/@luxuryplatesth,"fine_dining|restaurant|luxury","premium|polished|review",Bangkok,122000,33000,4.6,25-44,mixed,high,Premium dining focus
-Thai Tea Trails,@thaiteatrails,https://www.tiktok.com/@thaiteatrails,"cafe|tea|dessert|local","cozy|review|aesthetic",Bangkok,64000,17000,6.9,18-34,female_skew,low,Strong beverage content
-Budget Bite Bangkok,@budgetbitebkk,https://www.tiktok.com/@budgetbitebkk,"food|restaurant|cafe|value","affordable|casual|review",Bangkok,171000,49000,5.6,18-34,mixed,medium,Value-focused content
-Art Space Cafe TH,@artspacecafeth,https://www.tiktok.com/@artspacecafeth,"cafe|art|dessert|lifestyle","aesthetic|creative|cozy",Bangkok,52000,16000,7.6,18-32,female_skew,low,Creative cafe audience
+name,handle,profile_url,niche_tags,style_tags,location,followers,avg_views,engagement_rate,audience_age,audience_gender_skew,demographics_source,cost_tier,brand_safety_notes
+May Cafe Hopping,@maycafehop,https://www.tiktok.com/@maycafehop,"cafe|coffee|dessert|lifestyle","aesthetic|cozy|review",Bangkok,185000,52000,5.8,18-34,female_skew,sample_estimate,medium,Generally brand-safe food and cafe reviews
+Kin Rai Dee,@kinraidee,https://www.tiktok.com/@kinraidee,"food|restaurant|street_food|dessert","review|casual|value",Bangkok,420000,110000,4.9,18-34,mixed,sample_estimate,high,Occasional spicy street food humor
+BKK Brunch Club,@bkkbrunchclub,https://www.tiktok.com/@bkkbrunchclub,"brunch|cafe|coffee|restaurant","premium|aesthetic|review",Bangkok,98000,31000,6.4,22-38,female_skew,sample_estimate,medium,Polished restaurant content
+Ari Eats,@arieats,https://www.tiktok.com/@arieats,"cafe|restaurant|dessert|local","cozy|review|neighborhood",Bangkok,76000,22000,7.1,18-34,mixed,sample_estimate,low,Local Bangkok neighborhood focus
+Thai Dessert Diary,@thaidessertdiary,https://www.tiktok.com/@thaidessertdiary,"dessert|bakery|cafe|food","aesthetic|sweet|review",Bangkok,132000,43000,6.2,18-30,female_skew,sample_estimate,medium,Strong dessert alignment
+Coffee Nerd TH,@coffeenerdth,https://www.tiktok.com/@coffeenerdth,"coffee|cafe|specialty_coffee","educational|premium|review",Bangkok,88000,26000,5.5,22-40,mixed,sample_estimate,medium,Specialty coffee content
+Siam Food Finds,@siamfoodfinds,https://www.tiktok.com/@siamfoodfinds,"food|restaurant|cafe|mall","review|trendy|casual",Bangkok,245000,68000,4.7,18-34,mixed,sample_estimate,high,Broad food discovery
+Cozy Table TH,@cozytableth,https://www.tiktok.com/@cozytableth,"cafe|brunch|dessert","cozy|aesthetic|lifestyle",Bangkok,54000,18000,7.8,18-32,female_skew,sample_estimate,low,Micro KOL with strong fit
+Hungry Office BKK,@hungryofficebkk,https://www.tiktok.com/@hungryofficebkk,"food|lunch|cafe|restaurant","office|value|review",Bangkok,117000,36000,5.2,22-38,mixed,sample_estimate,medium,Good office worker audience
+Nomad Bites TH,@nomadbitesth,https://www.tiktok.com/@nomadbitesth,"travel|food|cafe","tourist|casual|review",Bangkok,156000,41000,4.5,20-36,mixed,sample_estimate,medium,Travel-heavy audience
+Chiang Mai Cafe Map,@cmcafemap,https://www.tiktok.com/@cmcafemap,"cafe|coffee|dessert|travel","cozy|aesthetic|review",Chiang Mai,93000,27000,6.0,18-34,female_skew,sample_estimate,medium,Best for Chiang Mai campaigns
+Phuket Food Weekend,@phuketfoodweekend,https://www.tiktok.com/@phuketfoodweekend,"food|restaurant|travel|cafe","tourist|review|casual",Phuket,81000,24000,5.4,20-40,mixed,sample_estimate,medium,Best for Phuket campaigns
+Beauty With Bow,@beautywithbow,https://www.tiktok.com/@beautywithbow,"beauty|skincare|lifestyle","premium|tutorial|review",Bangkok,310000,82000,4.8,18-34,female_skew,sample_estimate,high,Beauty-first creator
+Fit Thai Daily,@fitthaidaily,https://www.tiktok.com/@fitthaidaily,"fitness|health|meal_prep","educational|routine|wellness",Bangkok,205000,57000,5.1,18-35,mixed,sample_estimate,high,Fitness-first creator
+Campus Eats TH,@campuseatsth,https://www.tiktok.com/@campuseatsth,"food|cafe|dessert|student","value|casual|review",Bangkok,67000,21000,7.4,16-24,mixed,sample_estimate,low,Strong student audience
+Family Food Trip,@familyfoodtrip,https://www.tiktok.com/@familyfoodtrip,"food|restaurant|family|cafe","family_friendly|review|weekend",Bangkok,143000,38000,5.0,25-44,female_skew,sample_estimate,medium,Family audience
+Minimal Cafe Lens,@minimalcafelens,https://www.tiktok.com/@minimalcafelens,"cafe|coffee|dessert|photography","minimal|aesthetic|cozy",Bangkok,59000,20000,8.1,18-30,female_skew,sample_estimate,low,Highly visual cafe content
+Night Market Guy,@nightmarketguy,https://www.tiktok.com/@nightmarketguy,"street_food|night_market|food","casual|humor|value",Bangkok,390000,125000,4.3,18-34,mixed,sample_estimate,high,Night market focus
+Pet Friendly Places,@petfriendlyplaces,https://www.tiktok.com/@petfriendlyplaces,"pet|cafe|lifestyle","family_friendly|cozy|review",Bangkok,73000,19000,6.7,22-40,female_skew,sample_estimate,low,Good for pet-friendly venues
+Vegan Bangkok Guide,@veganbangkokguide,https://www.tiktok.com/@veganbangkokguide,"vegan|restaurant|cafe|health","educational|review|niche",Bangkok,48000,14000,7.0,20-38,mixed,sample_estimate,low,Niche vegan audience
+Luxury Plates TH,@luxuryplatesth,https://www.tiktok.com/@luxuryplatesth,"fine_dining|restaurant|luxury","premium|polished|review",Bangkok,122000,33000,4.6,25-44,mixed,sample_estimate,high,Premium dining focus
+Thai Tea Trails,@thaiteatrails,https://www.tiktok.com/@thaiteatrails,"cafe|tea|dessert|local","cozy|review|aesthetic",Bangkok,64000,17000,6.9,18-34,female_skew,sample_estimate,low,Strong beverage content
+Budget Bite Bangkok,@budgetbitebkk,https://www.tiktok.com/@budgetbitebkk,"food|restaurant|cafe|value","affordable|casual|review",Bangkok,171000,49000,5.6,18-34,mixed,sample_estimate,medium,Value-focused content
+Art Space Cafe TH,@artspacecafeth,https://www.tiktok.com/@artspacecafeth,"cafe|art|dessert|lifestyle","aesthetic|creative|cozy",Bangkok,52000,16000,7.6,18-32,female_skew,sample_estimate,low,Creative cafe audience

@@ -21,6 +21,7 @@ REQUIRED_COLUMNS = [
     "engagement_rate",
     "audience_age",
     "audience_gender_skew",
+    "demographics_source",
     "cost_tier",
     "brand_safety_notes",
 ]
@@ -34,6 +35,7 @@ def load_sample_kols(path: Path = DATA_PATH) -> pd.DataFrame:
     for column in ["niche_tags", "style_tags"]:
         df[column] = df[column].fillna("").astype(str)
     df["profile_url"] = df["profile_url"].fillna("")
+    df["demographics_source"] = df["demographics_source"].fillna("sample_estimate")
     return df
 
 
@@ -62,7 +64,8 @@ def _extract_tiktok_handle_from_url(url: Any) -> str:
     text = str(url).strip()
     if not text:
         return ""
-    if text.startswith("www.tiktok.com/") or text.startswith("tiktok.com/"):
+    lower_text = text.lower()
+    if lower_text.startswith("www.tiktok.com/") or lower_text.startswith("tiktok.com/"):
         text = f"https://{text}"
 
     parsed = urlsplit(text)
@@ -92,6 +95,24 @@ def _first_handle(*values: Any) -> str:
         if handle:
             return handle
     return ""
+
+
+def _coerce_int(value: Any) -> int:
+    if value in (None, ""):
+        return 0
+    text = str(value).strip().replace(",", "")
+    if not text:
+        return 0
+    return int(float(text))
+
+
+def _coerce_float(value: Any) -> float:
+    if value in (None, ""):
+        return 0.0
+    text = str(value).strip().replace(",", "")
+    if not text:
+        return 0.0
+    return float(text)
 
 
 def normalize_apify_profile(raw: dict[str, Any]) -> dict[str, Any]:
@@ -129,11 +150,12 @@ def normalize_apify_profile(raw: dict[str, Any]) -> dict[str, Any]:
         "niche_tags": raw.get("niche_tags", ""),
         "style_tags": raw.get("style_tags", ""),
         "location": raw.get("location", "Thailand"),
-        "followers": int(followers or 0),
-        "avg_views": int(raw.get("playCount") or raw.get("avg_views") or 0),
-        "engagement_rate": float(raw.get("engagement_rate") or 0),
+        "followers": _coerce_int(followers),
+        "avg_views": _coerce_int(raw.get("playCount") or raw.get("avg_views")),
+        "engagement_rate": _coerce_float(raw.get("engagement_rate")),
         "audience_age": raw.get("audience_age", "unknown"),
         "audience_gender_skew": raw.get("audience_gender_skew", "unknown"),
+        "demographics_source": raw.get("demographics_source") or "live_unverified",
         "cost_tier": raw.get("cost_tier", "unknown"),
         "brand_safety_notes": raw.get("brand_safety_notes", "Live data requires manual review"),
     }
