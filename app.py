@@ -62,7 +62,7 @@ if st.button("Analyze and Match KOLs", type="primary"):
         st.stop()
 
     profile = analyze_brand(website_url=website_url, facebook_url=facebook_url, pasted_text=pasted_text)
-    kols, kol_warnings = load_kols(use_apify=use_apify)
+    kols, kol_warnings = load_kols(use_apify=use_apify, brand_profile=profile)
     ranked = rank_kols(profile, kols)
 
     st.session_state.profile = profile

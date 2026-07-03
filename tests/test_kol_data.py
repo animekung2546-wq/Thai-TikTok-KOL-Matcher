@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from kol_data import load_kols, load_sample_kols, normalize_apify_profile
+from kol_data import build_apify_actor_input, fetch_apify_kols, load_kols, load_sample_kols, normalize_apify_profile
 
 
 REQUIRED_COLUMNS = [
@@ -39,15 +39,111 @@ def test_load_kols_with_apify_missing_token_warns(monkeypatch):
     assert warnings == ["APIFY_TOKEN is missing, so the app is using the bundled sample KOL dataset."]
 
 
-def test_load_kols_with_apify_token_warns_sample_source(monkeypatch):
-    monkeypatch.setenv("APIFY_TOKEN", "token-for-test")
+class FakeItemsPage:
+    def __init__(self, items):
+        self.items = items
 
-    df, warnings = load_kols(use_apify=True)
+
+class FakeDatasetClient:
+    def __init__(self, calls, items):
+        self.calls = calls
+        self.items = items
+
+    def list_items(self, **kwargs):
+        self.calls["list_items"] = kwargs
+        return FakeItemsPage(self.items)
+
+
+class FakeActorClient:
+    def __init__(self, calls):
+        self.calls = calls
+
+    def call(self, **kwargs):
+        self.calls["call"] = kwargs
+        return {"defaultDatasetId": "dataset-1"}
+
+
+class FakeApifyClient:
+    calls = {}
+    items = []
+
+    def __init__(self, token):
+        self.calls["token"] = token
+
+    def actor(self, actor_id):
+        self.calls["actor_id"] = actor_id
+        return FakeActorClient(self.calls)
+
+    def dataset(self, dataset_id):
+        self.calls["dataset_id"] = dataset_id
+        return FakeDatasetClient(self.calls, self.items)
+
+
+def test_build_apify_actor_input_uses_brand_hashtags():
+    actor_input = build_apify_actor_input(
+        {
+            "keywords": ["cafe", "coffee", "dessert"],
+            "locations": ["Bangkok"],
+            "content_pillars": ["specialty coffee"],
+        },
+        max_items=12,
+    )
+
+    assert actor_input["hashtags"] == ["cafe", "coffee", "dessert", "bangkok", "specialtycoffee"]
+    assert actor_input["resultsPerPage"] == 12
+    assert actor_input["commentsPerPost"] == 0
+
+
+def test_fetch_apify_kols_calls_actor_and_normalizes_items(monkeypatch):
+    FakeApifyClient.calls = {}
+    FakeApifyClient.items = [
+        {
+            "authorMeta": {"name": "livecafe", "nickName": "Live Cafe", "fans": "12,345"},
+            "webVideoUrl": "https://www.tiktok.com/@livecafe/video/123",
+            "playCount": "4,321",
+            "hashtags": [{"name": "cafe"}, {"name": "coffee"}],
+        }
+    ]
+    monkeypatch.delenv("APIFY_INPUT_JSON", raising=False)
+    monkeypatch.delenv("APIFY_ACTOR_ID", raising=False)
+
+    df = fetch_apify_kols(
+        {"keywords": ["cafe", "coffee"], "locations": ["Bangkok"]},
+        token="token-for-test",
+        max_items=5,
+        client_factory=FakeApifyClient,
+    )
+
+    assert len(df) == 1
+    assert df.iloc[0]["handle"] == "@livecafe"
+    assert df.iloc[0]["profile_url"] == "https://www.tiktok.com/@livecafe"
+    assert df.iloc[0]["niche_tags"] == "cafe|coffee"
+    assert df.iloc[0]["followers"] == 12345
+    assert FakeApifyClient.calls["token"] == "token-for-test"
+    assert FakeApifyClient.calls["actor_id"] == "clockworks/free-tiktok-scraper"
+    assert FakeApifyClient.calls["dataset_id"] == "dataset-1"
+    assert FakeApifyClient.calls["call"]["run_input"]["hashtags"] == ["cafe", "coffee", "bangkok"]
+    assert FakeApifyClient.calls["list_items"]["limit"] == 5
+
+
+def test_load_kols_with_apify_token_uses_live_fetch(monkeypatch):
+    monkeypatch.setenv("APIFY_TOKEN", "token-for-test")
+    monkeypatch.setattr("kol_data.fetch_apify_kols", lambda brand_profile=None: load_sample_kols().head(2))
+
+    df, warnings = load_kols(use_apify=True, brand_profile={"keywords": ["cafe"]})
+
+    assert len(df) == 2
+    assert warnings == ["Loaded 2 live TikTok profiles from Apify."]
+
+
+def test_load_kols_falls_back_when_apify_returns_empty(monkeypatch):
+    monkeypatch.setenv("APIFY_TOKEN", "token-for-test")
+    monkeypatch.setattr("kol_data.fetch_apify_kols", lambda brand_profile=None: load_sample_kols().head(0))
+
+    df, warnings = load_kols(use_apify=True, brand_profile={"keywords": ["cafe"]})
 
     assert len(df) == 24
-    assert len(warnings) == 1
-    assert "APIFY_TOKEN detected" in warnings[0]
-    assert "stable demo source" in warnings[0]
+    assert "Apify returned no usable TikTok profiles" in warnings[0]
 
 
 def test_video_url_normalizes_to_creator_profile_url():

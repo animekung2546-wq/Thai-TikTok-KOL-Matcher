@@ -33,7 +33,24 @@ $env:OPENAI_API_KEY="your-openai-key"
 $env:APIFY_TOKEN="your-apify-token"
 ```
 
-The app works without these keys. `OPENAI_API_KEY` enables AI brand extraction. `APIFY_TOKEN` is reserved for TikTok/Apify data collection experiments and falls back to sample data if unavailable.
+The app works without these keys. The current brand analyzer uses deterministic heuristics. `APIFY_TOKEN` enables live TikTok collection through Apify. If Apify fails or returns no usable profiles, the app falls back to sample data.
+
+Run with live Apify collection:
+
+```powershell
+$env:APIFY_TOKEN="your-apify-token"
+$env:APIFY_MAX_ITEMS="20"
+streamlit run app.py
+```
+
+Optional Apify controls:
+
+```powershell
+$env:APIFY_ACTOR_ID="clockworks/free-tiktok-scraper"
+$env:APIFY_MAX_ITEMS="20"
+```
+
+The default Actor input is generated from the detected brand keywords and locations. To override it completely, set `APIFY_INPUT_JSON` to a JSON object accepted by the chosen Apify Actor.
 
 Keep real API keys local and do not commit them to git.
 
@@ -45,7 +62,7 @@ Keep real API keys local and do not commit them to git.
 4. Review the Brand Profile Summary.
 5. Walk through Top 5 KOL cards and the detailed ranking table.
 6. Download CSV and Markdown reports.
-7. Explain that the app is stable without keys and can be upgraded with OpenAI/Apify hooks.
+7. Explain that the app runs without keys, and with `APIFY_TOKEN` it can pull live TikTok profiles through Apify.
 
 ## Ethics and Privacy
 
@@ -73,6 +90,6 @@ Expected app behavior:
 
 - Problem: influencer shortlisting is slow when teams manually inspect client pages and TikTok profiles.
 - Prototype: converts client content into a structured brand profile and ranks KOLs using transparent weighted scoring.
-- Reliability: works without API keys, avoids fragile login-wall scraping, and includes optional OpenAI/Apify upgrade paths.
+- Reliability: works without API keys, avoids fragile login-wall scraping, and uses Apify live collection when `APIFY_TOKEN` is configured.
 - Business value: reduces first-pass KOL discovery time and gives the marketing team a consistent shortlist with reasons.
 - Future enhancements: verified live TikTok collection, campaign performance feedback loop, richer brand safety checks, CRM integration, and human approval workflows.

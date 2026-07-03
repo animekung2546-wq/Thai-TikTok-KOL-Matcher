@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,8 @@ import pandas as pd
 
 
 DATA_PATH = Path(__file__).parent / "data" / "sample_kols.csv"
+DEFAULT_APIFY_ACTOR_ID = "clockworks/free-tiktok-scraper"
+DEFAULT_APIFY_MAX_ITEMS = 20
 REQUIRED_COLUMNS = [
     "name",
     "handle",
@@ -27,6 +30,10 @@ REQUIRED_COLUMNS = [
 ]
 
 
+class ApifyFetchError(RuntimeError):
+    pass
+
+
 def load_sample_kols(path: Path = DATA_PATH) -> pd.DataFrame:
     df = pd.read_csv(path)
     missing_columns = [column for column in REQUIRED_COLUMNS if column not in df.columns]
@@ -39,16 +46,130 @@ def load_sample_kols(path: Path = DATA_PATH) -> pd.DataFrame:
     return df
 
 
-def load_kols(use_apify: bool = False) -> tuple[pd.DataFrame, list[str]]:
+def load_kols(use_apify: bool = False, brand_profile: dict[str, Any] | None = None) -> tuple[pd.DataFrame, list[str]]:
     warnings: list[str] = []
-    if use_apify and os.getenv("APIFY_TOKEN"):
-        warnings.append(
-            "APIFY_TOKEN detected. Prototype keeps sample data as the stable demo source; "
-            "replace fetch_apify_kols() with a chosen TikTok Actor for live collection."
-        )
-    elif use_apify:
+    if not use_apify:
+        return load_sample_kols(), warnings
+
+    if not os.getenv("APIFY_TOKEN"):
         warnings.append("APIFY_TOKEN is missing, so the app is using the bundled sample KOL dataset.")
-    return load_sample_kols(), warnings
+        return load_sample_kols(), warnings
+
+    try:
+        live_kols = fetch_apify_kols(brand_profile=brand_profile)
+    except ApifyFetchError as exc:
+        warnings.append(f"Apify live fetch failed: {exc}. Using the bundled sample KOL dataset.")
+        return load_sample_kols(), warnings
+
+    if live_kols.empty:
+        warnings.append("Apify returned no usable TikTok profiles, so the app is using the bundled sample KOL dataset.")
+        return load_sample_kols(), warnings
+
+    warnings.append(f"Loaded {len(live_kols)} live TikTok profiles from Apify.")
+    return live_kols, warnings
+
+
+def fetch_apify_kols(
+    brand_profile: dict[str, Any] | None = None,
+    *,
+    token: str | None = None,
+    actor_id: str | None = None,
+    max_items: int | None = None,
+    client_factory: Any | None = None,
+) -> pd.DataFrame:
+    api_token = token or os.getenv("APIFY_TOKEN")
+    if not api_token:
+        raise ApifyFetchError("APIFY_TOKEN is missing")
+
+    actor_name = actor_id or os.getenv("APIFY_ACTOR_ID") or DEFAULT_APIFY_ACTOR_ID
+    item_limit = max_items or _env_int("APIFY_MAX_ITEMS", DEFAULT_APIFY_MAX_ITEMS)
+    actor_input = build_apify_actor_input(brand_profile or {}, item_limit)
+
+    try:
+        if client_factory is None:
+            from apify_client import ApifyClient
+
+            client_factory = ApifyClient
+        client = client_factory(api_token)
+        run = client.actor(actor_name).call(run_input=actor_input)
+        dataset_id = _read_field(run, "defaultDatasetId") or _read_field(run, "default_dataset_id")
+        if not dataset_id:
+            raise ApifyFetchError("Actor run did not return a default dataset ID")
+        items_page = client.dataset(dataset_id).list_items(limit=item_limit, clean=True)
+        raw_items = _dataset_items(items_page)
+    except ApifyFetchError:
+        raise
+    except Exception as exc:
+        raise ApifyFetchError(str(exc)) from exc
+
+    rows = [normalize_apify_profile(item) for item in raw_items[:item_limit]]
+    rows = [row for row in rows if row["handle"] != "@unknown" and row["profile_url"].startswith("https://www.tiktok.com/@")]
+    return pd.DataFrame(rows, columns=REQUIRED_COLUMNS)
+
+
+def build_apify_actor_input(brand_profile: dict[str, Any], max_items: int) -> dict[str, Any]:
+    custom_input = os.getenv("APIFY_INPUT_JSON")
+    if custom_input:
+        try:
+            parsed_input = json.loads(custom_input)
+        except json.JSONDecodeError as exc:
+            raise ApifyFetchError(f"APIFY_INPUT_JSON is invalid JSON: {exc}") from exc
+        if not isinstance(parsed_input, dict):
+            raise ApifyFetchError("APIFY_INPUT_JSON must decode to a JSON object")
+        return parsed_input
+
+    hashtags = _hashtags_from_brand_profile(brand_profile)
+    return {
+        "hashtags": hashtags,
+        "resultsPerPage": max_items,
+        "maxFollowersPerProfile": 0,
+        "maxFollowingPerProfile": 0,
+        "commentsPerPost": 0,
+        "topLevelCommentsPerPost": 0,
+        "maxRepliesPerComment": 0,
+        "proxyCountryCode": "None",
+    }
+
+
+def _hashtags_from_brand_profile(brand_profile: dict[str, Any]) -> list[str]:
+    values: list[str] = []
+    for key in ["keywords", "locations", "content_pillars"]:
+        raw_value = brand_profile.get(key, [])
+        if isinstance(raw_value, str):
+            values.append(raw_value)
+        else:
+            values.extend(str(value) for value in raw_value)
+
+    hashtags: list[str] = []
+    for value in values:
+        hashtag = "".join(character.lower() for character in value if character.isalnum())
+        if hashtag and hashtag not in hashtags:
+            hashtags.append(hashtag)
+    return (hashtags or ["cafe"])[:5]
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if not value:
+        return default
+    try:
+        return max(1, int(value))
+    except ValueError:
+        return default
+
+
+def _read_field(value: Any, field_name: str) -> Any:
+    if isinstance(value, dict):
+        return value.get(field_name)
+    return getattr(value, field_name, None)
+
+
+def _dataset_items(items_page: Any) -> list[dict[str, Any]]:
+    if isinstance(items_page, list):
+        return items_page
+    if isinstance(items_page, dict):
+        return list(items_page.get("items", []))
+    return list(getattr(items_page, "items", []) or [])
 
 
 def _normalize_tiktok_profile_url(url: Any) -> str:
@@ -147,8 +268,8 @@ def normalize_apify_profile(raw: dict[str, Any]) -> dict[str, Any]:
         "name": author.get("nickName") or raw.get("name") or normalized_handle,
         "handle": f"@{normalized_handle}",
         "profile_url": profile_url,
-        "niche_tags": raw.get("niche_tags", ""),
-        "style_tags": raw.get("style_tags", ""),
+        "niche_tags": raw.get("niche_tags") or _tags_from_apify_item(raw),
+        "style_tags": raw.get("style_tags") or "live|apify",
         "location": raw.get("location", "Thailand"),
         "followers": _coerce_int(followers),
         "avg_views": _coerce_int(raw.get("playCount") or raw.get("avg_views")),
@@ -159,3 +280,24 @@ def normalize_apify_profile(raw: dict[str, Any]) -> dict[str, Any]:
         "cost_tier": raw.get("cost_tier", "unknown"),
         "brand_safety_notes": raw.get("brand_safety_notes", "Live data requires manual review"),
     }
+
+
+def _tags_from_apify_item(raw: dict[str, Any]) -> str:
+    raw_hashtags = raw.get("hashtags") or raw.get("hashtagsList") or []
+    if isinstance(raw_hashtags, str):
+        tags = [raw_hashtags]
+    elif isinstance(raw_hashtags, list):
+        tags = []
+        for item in raw_hashtags:
+            if isinstance(item, dict):
+                tags.append(str(item.get("name") or item.get("title") or ""))
+            else:
+                tags.append(str(item))
+    else:
+        tags = []
+    cleaned = []
+    for tag in tags:
+        normalized = tag.strip().strip("#").lower()
+        if normalized and normalized not in cleaned:
+            cleaned.append(normalized)
+    return "|".join(cleaned[:8])

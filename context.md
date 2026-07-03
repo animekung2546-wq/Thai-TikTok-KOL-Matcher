@@ -17,6 +17,9 @@ The app helps a marketing team analyze a client's website, Facebook page, or pas
 - Optional environment variables:
   - `OPENAI_API_KEY`
   - `APIFY_TOKEN`
+  - `APIFY_ACTOR_ID`
+  - `APIFY_MAX_ITEMS`
+  - `APIFY_INPUT_JSON`
 
 ## How To Run
 
@@ -84,7 +87,7 @@ The matcher returns a `match_score`, component scores, and a recommendation reas
 
 The sample KOL dataset contains 24 rows. Demographic fields use `demographics_source=sample_estimate` so downstream users know these values are prototype metadata, not verified audience data.
 
-Apify normalization uses `demographics_source=live_unverified` by default for raw live-style records. The current app does not make live Apify calls; it keeps sample data as the stable demo source and shows warnings when Apify mode is requested.
+Apify normalization uses `demographics_source=live_unverified` by default for raw live records. When `APIFY_TOKEN` exists and the sidebar Apify option is enabled, the app calls an Apify Actor and normalizes dataset items into the KOL schema. If the Actor fails or returns no usable profiles, the app falls back to the sample dataset and shows a warning.
 
 ## Ethics and Privacy
 
@@ -97,8 +100,8 @@ Apify normalization uses `demographics_source=live_unverified` by default for ra
 ## Known Constraints
 
 - Facebook scraping is best-effort and can fail because many pages block unauthenticated access.
-- TikTok data is sample-backed for demo reliability.
-- `OPENAI_API_KEY` and `APIFY_TOKEN` are optional hooks, not required for the no-key demo path.
+- TikTok live data depends on the configured Apify Actor, account quota, and TikTok availability.
+- `OPENAI_API_KEY` and `APIFY_TOKEN` are optional; the no-key demo path still works.
 
 ## Useful Docs
 
