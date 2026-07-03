@@ -26,7 +26,7 @@ streamlit run app.py
 
 ## Optional API Keys
 
-Create a `.env` file or set environment variables in your shell:
+Set environment variables in your shell:
 
 ```powershell
 $env:OPENAI_API_KEY="your-openai-key"
@@ -34,6 +34,8 @@ $env:APIFY_TOKEN="your-apify-token"
 ```
 
 The app works without these keys. `OPENAI_API_KEY` enables AI brand extraction. `APIFY_TOKEN` is reserved for TikTok/Apify data collection experiments and falls back to sample data if unavailable.
+
+Keep real API keys local and do not commit them to git.
 
 ## Demo Flow for Loom
 
