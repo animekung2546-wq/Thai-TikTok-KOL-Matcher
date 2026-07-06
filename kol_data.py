@@ -11,7 +11,7 @@ import pandas as pd
 
 DATA_PATH = Path(__file__).parent / "data" / "sample_kols.csv"
 DEFAULT_APIFY_ACTOR_ID = "clockworks/free-tiktok-scraper"
-DEFAULT_APIFY_MAX_ITEMS = 20
+DEFAULT_APIFY_MAX_ITEMS = 50
 THAI_MARKET_TERMS = {
     "thailand",
     "thai",
@@ -62,6 +62,7 @@ def load_kols(
     use_apify: bool = False,
     brand_profile: dict[str, Any] | None = None,
     apify_token: str | None = None,
+    apify_max_items: int | None = None,
 ) -> tuple[pd.DataFrame, list[str]]:
     warnings: list[str] = []
     if not use_apify:
@@ -79,7 +80,10 @@ def load_kols(
         return load_sample_kols(), warnings
 
     try:
-        live_kols = fetch_apify_kols(brand_profile=brand_profile, token=api_token)
+        fetch_kwargs: dict[str, Any] = {"brand_profile": brand_profile, "token": api_token}
+        if apify_max_items is not None:
+            fetch_kwargs["max_items"] = apify_max_items
+        live_kols = fetch_apify_kols(**fetch_kwargs)
     except ApifyFetchError as exc:
         warnings.append(f"Apify live fetch failed: {exc}. Using the bundled sample KOL dataset.")
         return load_sample_kols(), warnings
@@ -190,7 +194,7 @@ def _hashtags_from_brand_profile(brand_profile: dict[str, Any]) -> list[str]:
     for expansion in _intent_hashtag_expansions(brand_profile, hashtags):
         if expansion not in hashtags:
             hashtags.append(expansion)
-    return (hashtags or ["cafe"])[:8]
+    return (hashtags or ["cafe"])[:12]
 
 
 def _intent_hashtag_expansions(brand_profile: dict[str, Any], hashtags: list[str]) -> list[str]:
@@ -204,8 +208,18 @@ def _intent_hashtag_expansions(brand_profile: dict[str, Any], hashtags: list[str
     if terms & cafe_terms or "cafe" in category:
         expansions = []
         if is_bangkok_brand:
-            expansions.extend(["bangkokcafe", "bkkcafe", "cafehoppingbkk"])
-        expansions.extend(["cafehopping", "cafereview", "คาเฟ่", "รีวิวคาเฟ่"])
+            expansions.extend(
+                [
+                    "bangkokcafe",
+                    "bkkcafe",
+                    "cafehoppingbkk",
+                    "cafebangkok",
+                    "bangkokfoodie",
+                    "คาเฟ่กรุงเทพ",
+                    "รีวิวคาเฟ่กรุงเทพ",
+                ]
+            )
+        expansions.extend(["cafehopping", "cafereview", "thaicafe", "cafethailand", "คาเฟ่", "รีวิวคาเฟ่"])
         return expansions
     return []
 

@@ -65,7 +65,7 @@ Run with live Apify collection:
 
 ```powershell
 $env:APIFY_TOKEN="paste-your-real-apify-api-token-here"
-$env:APIFY_MAX_ITEMS="20"
+$env:APIFY_MAX_ITEMS="50"
 streamlit run app.py
 ```
 
@@ -73,10 +73,10 @@ Optional Apify controls:
 
 ```powershell
 $env:APIFY_ACTOR_ID="clockworks/free-tiktok-scraper"
-$env:APIFY_MAX_ITEMS="20"
+$env:APIFY_MAX_ITEMS="50"
 ```
 
-The default Actor input is generated from the detected brand keywords and locations. To override it completely, set `APIFY_INPUT_JSON` to a JSON object accepted by the chosen Apify Actor.
+The default Actor input is generated from the detected brand keywords and locations. The Streamlit sidebar also has an `Apify live candidates` control; raise it when Apify returns too few usable profiles after filtering. To override Actor input completely, set `APIFY_INPUT_JSON` to a JSON object accepted by the chosen Apify Actor.
 
 Keep real API keys local and do not commit them to git.
 

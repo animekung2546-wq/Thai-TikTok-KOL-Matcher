@@ -93,7 +93,7 @@ The sample KOL dataset contains 24 rows. Demographic fields use `demographics_so
 
 AI brand extraction returns category, keywords, audience, tone, locations, content pillars, Thai search terms, and a summary. The Streamlit sidebar supports Heuristic only, OpenAI, and OpenRouter. OpenRouter uses the OpenAI-compatible base URL `https://openrouter.ai/api/v1`, defaults to `openai/gpt-oss-20b:free`, and exposes free-model presets. If OpenRouter returns empty/non-JSON content, the app retries once without JSON mode before falling back to heuristic extraction with a warning.
 
-Apify normalization uses `demographics_source=live_unverified` by default for raw live records. When `APIFY_TOKEN` exists and the sidebar Apify option is enabled, the app calls an Apify Actor and normalizes dataset items into the KOL schema. Live rows must pass both brand relevance and Thai-market signal filters before ranking. If the Actor fails or returns no usable profiles, the app falls back to the sample dataset and shows a warning.
+Apify normalization uses `demographics_source=live_unverified` by default for raw live records. When `APIFY_TOKEN` exists and the sidebar Apify option is enabled, the app calls an Apify Actor and normalizes dataset items into the KOL schema. Live rows must pass both brand relevance and Thai-market signal filters before ranking. The sidebar exposes `Apify live candidates` so users can fetch a larger candidate pool before filtering; the default is 50. Cafe searches expand into Thai/Bangkok hashtags such as `bangkokcafe`, `cafehoppingbkk`, `คาเฟ่กรุงเทพ`, and `รีวิวคาเฟ่กรุงเทพ`. If the Actor fails or returns no usable profiles, the app falls back to the sample dataset and shows a warning.
 
 ## Ethics and Privacy
 

@@ -5,7 +5,7 @@ import os
 import streamlit as st
 
 from brand_analyzer import analyze_brand
-from kol_data import load_kols
+from kol_data import DEFAULT_APIFY_MAX_ITEMS, load_kols
 from matcher import rank_kols
 from reporting import rankings_to_csv, rankings_to_markdown
 
@@ -24,6 +24,13 @@ OPENROUTER_MODEL_OPTIONS = [
     "nvidia/nemotron-3-super-120b-a12b:free",
     "nvidia/nemotron-nano-9b-v2:free",
 ]
+
+
+def sidebar_int_env(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
 
 
 st.set_page_config(page_title="Thai TikTok KOL Matcher", page_icon="TH", layout="wide")
@@ -72,6 +79,13 @@ with st.sidebar:
         value=os.getenv("APIFY_TOKEN", ""),
         type="password",
         placeholder="apify_api_...",
+    )
+    apify_max_items = st.number_input(
+        "Apify live candidates",
+        min_value=10,
+        max_value=100,
+        value=min(100, max(10, sidebar_int_env("APIFY_MAX_ITEMS", DEFAULT_APIFY_MAX_ITEMS))),
+        step=10,
     )
     st.markdown("### Runtime")
     st.write("Brand AI:", ai_provider_label)
@@ -126,7 +140,12 @@ if st.button("Analyze and Match KOLs", type="primary"):
         pasted_text=pasted_text,
         ai_settings=ai_settings,
     )
-    kols, kol_warnings = load_kols(use_apify=use_apify, brand_profile=profile, apify_token=apify_token)
+    kols, kol_warnings = load_kols(
+        use_apify=use_apify,
+        brand_profile=profile,
+        apify_token=apify_token,
+        apify_max_items=apify_max_items,
+    )
     ranked = rank_kols(profile, kols)
 
     st.session_state.profile = profile

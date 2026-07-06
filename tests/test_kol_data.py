@@ -223,6 +223,28 @@ def test_load_kols_uses_apify_token_from_app_input(monkeypatch):
     assert warnings == ["Loaded 1 live TikTok profiles from Apify."]
 
 
+def test_load_kols_passes_apify_max_items(monkeypatch):
+    calls = {}
+
+    def fake_fetch(brand_profile=None, token=None, max_items=None):
+        calls["max_items"] = max_items
+        return load_sample_kols().head(3)
+
+    monkeypatch.delenv("APIFY_TOKEN", raising=False)
+    monkeypatch.setattr("kol_data.fetch_apify_kols", fake_fetch)
+
+    df, warnings = load_kols(
+        use_apify=True,
+        brand_profile={"keywords": ["cafe"]},
+        apify_token="token-from-app",
+        apify_max_items=80,
+    )
+
+    assert len(df) == 3
+    assert calls["max_items"] == 80
+    assert warnings == ["Loaded 3 live TikTok profiles from Apify."]
+
+
 def test_load_kols_with_placeholder_apify_token_warns(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "your-apify-token")
 
