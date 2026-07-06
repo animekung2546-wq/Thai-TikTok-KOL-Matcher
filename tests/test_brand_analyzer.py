@@ -34,8 +34,11 @@ class FakeChat:
 
 
 class FakeOpenAIClient:
-    def __init__(self, api_key):
-        self.api_key = api_key
+    init_calls = []
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        self.init_calls.append(kwargs)
         self.chat = FakeChat()
 
 
@@ -57,6 +60,7 @@ def test_cafe_text_returns_structured_profile():
 
 def test_openai_key_uses_ai_brand_extraction(monkeypatch):
     FakeChatCompletions.calls = []
+    FakeOpenAIClient.init_calls = []
     FakeChatCompletions.response_content = """
     {
       "category": "cafe_restaurant",
@@ -76,8 +80,54 @@ def test_openai_key_uses_ai_brand_extraction(monkeypatch):
 
     assert profile["analysis_mode"] == "openai"
     assert profile["keywords"] == ["cafe", "coffee", "dessert"]
+    assert FakeOpenAIClient.init_calls[0]["api_key"] == "sk-test"
     assert profile["thai_search_terms"] == ["รีวิวคาเฟ่", "คาเฟ่อารีย์", "bangkokcafe"]
     assert FakeChatCompletions.calls[0]["response_format"] == {"type": "json_object"}
+
+
+def test_openrouter_provider_uses_openrouter_base_url(monkeypatch):
+    FakeChatCompletions.calls = []
+    FakeOpenAIClient.init_calls = []
+    FakeChatCompletions.response_content = """
+    {
+      "category": "cafe_restaurant",
+      "keywords": ["cafe", "coffee"],
+      "target_audience": ["cafe_hoppers"],
+      "tone": ["cozy"],
+      "locations": ["Bangkok"],
+      "content_pillars": ["specialty coffee"],
+      "thai_search_terms": ["bangkokcafe"],
+      "summary": "Bangkok cafe profile."
+    }
+    """
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(brand_analyzer, "OpenAI", FakeOpenAIClient)
+
+    profile = analyze_brand_text(
+        "Bangkok cafe with specialty coffee",
+        ai_settings={
+            "provider": "openrouter",
+            "api_key": "sk-or-test",
+            "model": "openai/gpt-4o-mini",
+        },
+    )
+
+    assert profile["analysis_mode"] == "openrouter"
+    assert FakeOpenAIClient.init_calls[0]["api_key"] == "sk-or-test"
+    assert str(FakeOpenAIClient.init_calls[0]["base_url"]) == "https://openrouter.ai/api/v1"
+    assert FakeChatCompletions.calls[0]["model"] == "openai/gpt-4o-mini"
+
+
+def test_heuristic_provider_skips_configured_api_key(monkeypatch):
+    FakeChatCompletions.calls = []
+    FakeOpenAIClient.init_calls = []
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr(brand_analyzer, "OpenAI", FakeOpenAIClient)
+
+    profile = analyze_brand_text("Bangkok cafe serving coffee", ai_settings={"provider": "heuristic"})
+
+    assert profile["analysis_mode"] == "heuristic"
+    assert FakeOpenAIClient.init_calls == []
 
 
 def test_openai_failure_falls_back_to_heuristic(monkeypatch):

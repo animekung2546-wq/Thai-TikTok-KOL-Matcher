@@ -12,11 +12,14 @@ The app helps a marketing team analyze a client's website, Facebook page, or pas
 - Branch: `master`
 - App entrypoint: `app.py`
 - Local app URL when running: `http://localhost:8501`
-- Test suite: `34 passed` on the last verified run
+- Test suite: `37 passed` on the last verified run
 - The app runs without API keys by using heuristic analysis and bundled sample KOL data.
+- API keys can be entered directly in the Streamlit sidebar for the current session.
 - Optional environment variables:
   - `OPENAI_API_KEY`
   - `OPENAI_MODEL`
+  - `OPENROUTER_API_KEY`
+  - `OPENROUTER_MODEL`
   - `APIFY_TOKEN`
   - `APIFY_ACTOR_ID`
   - `APIFY_MAX_ITEMS`
@@ -40,13 +43,13 @@ streamlit run app.py
 Expected result:
 
 ```txt
-34 passed
+37 passed
 ```
 
 ## Main Files
 
 - `app.py`: Streamlit UI for the full demo flow.
-- `brand_analyzer.py`: Fetches public page text, uses OpenAI brand extraction when `OPENAI_API_KEY` is configured, and falls back to heuristics.
+- `brand_analyzer.py`: Fetches public page text, uses OpenAI/OpenRouter brand extraction when configured, and falls back to heuristics.
 - `kol_data.py`: Loads the bundled KOL dataset and provides the optional Apify normalization/filtering boundary.
 - `matcher.py`: Scores and ranks KOLs using weighted matching.
 - `reporting.py`: Generates CSV and Markdown exports.
@@ -55,7 +58,7 @@ Expected result:
 
 ## Tests
 
-- `tests/test_brand_analyzer.py`: Brand extraction, OpenAI fallback behavior, fetch fallback, HTML cleanup, source warnings.
+- `tests/test_brand_analyzer.py`: Brand extraction, OpenAI/OpenRouter provider behavior, fetch fallback, HTML cleanup, source warnings.
 - `tests/test_kol_data.py`: CSV schema, sample metadata, Apify fallback warnings, Thai-market filtering, URL normalization.
 - `tests/test_matcher.py`: Score ranges and relevant KOL ranking.
 - `tests/test_reporting.py`: CSV and Markdown export content.
@@ -88,7 +91,7 @@ The matcher returns a `match_score`, component scores, and a recommendation reas
 
 The sample KOL dataset contains 24 rows. Demographic fields use `demographics_source=sample_estimate` so downstream users know these values are prototype metadata, not verified audience data.
 
-OpenAI brand extraction returns category, keywords, audience, tone, locations, content pillars, Thai search terms, and a summary. If OpenAI is unavailable or returns invalid JSON, the app falls back to heuristic extraction and shows a warning.
+AI brand extraction returns category, keywords, audience, tone, locations, content pillars, Thai search terms, and a summary. The Streamlit sidebar supports Heuristic only, OpenAI, and OpenRouter. OpenRouter uses the OpenAI-compatible base URL `https://openrouter.ai/api/v1`. If the selected provider is unavailable or returns invalid JSON, the app falls back to heuristic extraction and shows a warning.
 
 Apify normalization uses `demographics_source=live_unverified` by default for raw live records. When `APIFY_TOKEN` exists and the sidebar Apify option is enabled, the app calls an Apify Actor and normalizes dataset items into the KOL schema. Live rows must pass both brand relevance and Thai-market signal filters before ranking. If the Actor fails or returns no usable profiles, the app falls back to the sample dataset and shows a warning.
 
@@ -104,7 +107,7 @@ Apify normalization uses `demographics_source=live_unverified` by default for ra
 
 - Facebook scraping is best-effort and can fail because many pages block unauthenticated access.
 - TikTok live data depends on the configured Apify Actor, account quota, TikTok availability, and whether Apify returns enough Thai-market signals in public fields.
-- `OPENAI_API_KEY` and `APIFY_TOKEN` are optional; the no-key demo path still works.
+- `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, and `APIFY_TOKEN` are optional; the no-key demo path still works.
 
 ## Useful Docs
 

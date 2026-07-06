@@ -198,12 +198,29 @@ def test_fetch_apify_kols_strips_accidental_token_quotes(monkeypatch):
 
 def test_load_kols_with_apify_token_uses_live_fetch(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "token-for-test")
-    monkeypatch.setattr("kol_data.fetch_apify_kols", lambda brand_profile=None: load_sample_kols().head(2))
+    monkeypatch.setattr("kol_data.fetch_apify_kols", lambda brand_profile=None, token=None: load_sample_kols().head(2))
 
     df, warnings = load_kols(use_apify=True, brand_profile={"keywords": ["cafe"]})
 
     assert len(df) == 2
     assert warnings == ["Loaded 2 live TikTok profiles from Apify."]
+
+
+def test_load_kols_uses_apify_token_from_app_input(monkeypatch):
+    calls = {}
+
+    def fake_fetch(brand_profile=None, token=None):
+        calls["token"] = token
+        return load_sample_kols().head(1)
+
+    monkeypatch.delenv("APIFY_TOKEN", raising=False)
+    monkeypatch.setattr("kol_data.fetch_apify_kols", fake_fetch)
+
+    df, warnings = load_kols(use_apify=True, brand_profile={"keywords": ["cafe"]}, apify_token="token-from-app")
+
+    assert len(df) == 1
+    assert calls["token"] == "token-from-app"
+    assert warnings == ["Loaded 1 live TikTok profiles from Apify."]
 
 
 def test_load_kols_with_placeholder_apify_token_warns(monkeypatch):
@@ -217,7 +234,7 @@ def test_load_kols_with_placeholder_apify_token_warns(monkeypatch):
 
 def test_load_kols_falls_back_when_apify_returns_empty(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "token-for-test")
-    monkeypatch.setattr("kol_data.fetch_apify_kols", lambda brand_profile=None: load_sample_kols().head(0))
+    monkeypatch.setattr("kol_data.fetch_apify_kols", lambda brand_profile=None, token=None: load_sample_kols().head(0))
 
     df, warnings = load_kols(use_apify=True, brand_profile={"keywords": ["cafe"]})
 

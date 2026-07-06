@@ -26,19 +26,29 @@ streamlit run app.py
 
 ## Optional API Keys
 
-Set environment variables in your shell:
+You can paste API keys directly in the app sidebar under **API Settings**. Keys are kept in the current Streamlit session and are not written to files.
+
+Supported AI providers:
+
+- **Heuristic only**: no AI API call.
+- **OpenAI**: uses `OPENAI_API_KEY` or the OpenAI key pasted in the app.
+- **OpenRouter**: uses `OPENROUTER_API_KEY` or the OpenRouter key pasted in the app, with OpenRouter's OpenAI-compatible endpoint.
+
+You can also set environment variables in your shell:
 
 ```powershell
 $env:OPENAI_API_KEY="paste-your-real-openai-api-key-here"
+$env:OPENROUTER_API_KEY="paste-your-real-openrouter-api-key-here"
 $env:APIFY_TOKEN="paste-your-real-apify-api-token-here"
 ```
 
-The app works without these keys. `OPENAI_API_KEY` enables AI brand-profile extraction with heuristic fallback. `APIFY_TOKEN` enables live TikTok collection through Apify. Live Apify profiles are filtered for brand relevance and Thai-market signals before ranking. If Apify fails or returns no usable profiles, the app falls back to sample data.
+The app works without these keys. `OPENAI_API_KEY` or `OPENROUTER_API_KEY` enables AI brand-profile extraction with heuristic fallback. `APIFY_TOKEN` enables live TikTok collection through Apify. Live Apify profiles are filtered for brand relevance and Thai-market signals before ranking. If Apify fails or returns no usable profiles, the app falls back to sample data.
 
-Optional OpenAI model override:
+Optional model overrides:
 
 ```powershell
 $env:OPENAI_MODEL="gpt-4o-mini"
+$env:OPENROUTER_MODEL="openai/gpt-4o-mini"
 ```
 
 Run with live Apify collection:
@@ -76,7 +86,7 @@ If Apify returns `User was not found or authentication token is not valid`, crea
 4. Review the Brand Profile Summary.
 5. Walk through Top 5 KOL cards and the detailed ranking table.
 6. Download CSV and Markdown reports.
-7. Explain that the app runs without keys, with `OPENAI_API_KEY` it uses AI brand extraction, and with `APIFY_TOKEN` it can pull live Thai-market TikTok profiles through Apify.
+7. Explain that the app runs without keys, can accept OpenAI/OpenRouter/Apify keys in the sidebar, and can pull live Thai-market TikTok profiles through Apify.
 
 ## Ethics and Privacy
 
@@ -104,6 +114,6 @@ Expected app behavior:
 
 - Problem: influencer shortlisting is slow when teams manually inspect client pages and TikTok profiles.
 - Prototype: converts client content into a structured brand profile and ranks KOLs using transparent weighted scoring.
-- Reliability: works without API keys, avoids fragile login-wall scraping, and uses Apify live collection when `APIFY_TOKEN` is configured.
+- Reliability: works without API keys, avoids fragile login-wall scraping, supports OpenAI/OpenRouter brand extraction, and uses Apify live collection when an Apify token is configured.
 - Business value: reduces first-pass KOL discovery time and gives the marketing team a consistent shortlist with reasons.
 - Future enhancements: verified live TikTok collection, campaign performance feedback loop, richer brand safety checks, CRM integration, and human approval workflows.

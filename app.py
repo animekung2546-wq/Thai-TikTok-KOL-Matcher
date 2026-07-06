@@ -25,11 +25,49 @@ st.caption("Reliable AI demo prototype for Convert Cake influencer shortlisting"
 
 with st.sidebar:
     st.header("Demo Controls")
-    use_apify = st.checkbox("Try Apify hook if token exists", value=False)
+    use_apify = st.checkbox("Use Apify live fetch", value=False)
     top_n = st.slider("Top KOLs", min_value=3, max_value=10, value=5)
+    st.markdown("### API Settings")
+    ai_provider_label = st.selectbox("Brand AI provider", ["Heuristic only", "OpenAI", "OpenRouter"], index=0)
+    openai_api_key = st.text_input(
+        "OpenAI API key",
+        value=os.getenv("OPENAI_API_KEY", ""),
+        type="password",
+        placeholder="sk-...",
+    )
+    openai_model = st.text_input("OpenAI model", value=os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
+    openrouter_api_key = st.text_input(
+        "OpenRouter API key",
+        value=os.getenv("OPENROUTER_API_KEY", ""),
+        type="password",
+        placeholder="sk-or-...",
+    )
+    openrouter_model = st.text_input(
+        "OpenRouter model",
+        value=os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
+    )
+    apify_token = st.text_input(
+        "Apify token",
+        value=os.getenv("APIFY_TOKEN", ""),
+        type="password",
+        placeholder="apify_api_...",
+    )
     st.markdown("### Runtime")
-    st.write("OpenAI key:", "configured" if os.getenv("OPENAI_API_KEY") else "not configured")
-    st.write("Apify token:", "configured" if os.getenv("APIFY_TOKEN") else "not configured")
+    st.write("Brand AI:", ai_provider_label)
+    st.write("OpenAI key:", "configured" if openai_api_key else "not configured")
+    st.write("OpenRouter key:", "configured" if openrouter_api_key else "not configured")
+    st.write("Apify token:", "configured" if apify_token else "not configured")
+
+provider_value = {
+    "Heuristic only": "heuristic",
+    "OpenAI": "openai",
+    "OpenRouter": "openrouter",
+}[ai_provider_label]
+ai_settings = {
+    "provider": provider_value,
+    "api_key": openrouter_api_key if provider_value == "openrouter" else openai_api_key,
+    "model": openrouter_model if provider_value == "openrouter" else openai_model,
+}
 
 if "pasted_text" not in st.session_state:
     st.session_state.pasted_text = ""
@@ -61,8 +99,13 @@ if st.button("Analyze and Match KOLs", type="primary"):
         st.error("Add a URL, paste brand content, or click Load Thai Cafe Demo.")
         st.stop()
 
-    profile = analyze_brand(website_url=website_url, facebook_url=facebook_url, pasted_text=pasted_text)
-    kols, kol_warnings = load_kols(use_apify=use_apify, brand_profile=profile)
+    profile = analyze_brand(
+        website_url=website_url,
+        facebook_url=facebook_url,
+        pasted_text=pasted_text,
+        ai_settings=ai_settings,
+    )
+    kols, kol_warnings = load_kols(use_apify=use_apify, brand_profile=profile, apify_token=apify_token)
     ranked = rank_kols(profile, kols)
 
     st.session_state.profile = profile

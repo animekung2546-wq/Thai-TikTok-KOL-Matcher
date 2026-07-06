@@ -11,6 +11,9 @@ from bs4 import BeautifulSoup
 
 
 TEXT_CAP = 12000
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini"
 
 KEYWORD_PATTERNS: dict[str, tuple[str, ...]] = {
     "coffee": ("coffee", "espresso", "latte", "cappuccino", "americano"),
@@ -72,7 +75,12 @@ def fetch_public_text(url: str, timeout: int = 8) -> tuple[str, str | None]:
     return text[:TEXT_CAP], None
 
 
-def analyze_brand(website_url: str = "", facebook_url: str = "", pasted_text: str = "") -> dict[str, Any]:
+def analyze_brand(
+    website_url: str = "",
+    facebook_url: str = "",
+    pasted_text: str = "",
+    ai_settings: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     source_texts = [pasted_text]
     source_warnings: list[str] = []
 
@@ -83,31 +91,86 @@ def analyze_brand(website_url: str = "", facebook_url: str = "", pasted_text: st
         if warning:
             source_warnings.append(warning)
 
-    profile = analyze_brand_text(" ".join(source_texts))
+    profile = analyze_brand_text(" ".join(source_texts), ai_settings=ai_settings)
     profile["source_warnings"] = source_warnings
     return profile
 
 
-def analyze_brand_text(text: str) -> dict[str, Any]:
+def analyze_brand_text(text: str, ai_settings: dict[str, Any] | None = None) -> dict[str, Any]:
     normalized_text = _collapse_whitespace(text)
     if not normalized_text:
         return _blank_profile()
 
-    api_key = _clean_openai_key(os.getenv("OPENAI_API_KEY"))
-    if api_key and not _is_placeholder_openai_key(api_key):
+    ai_config = _resolve_ai_config(ai_settings)
+    if ai_config["provider"] != "heuristic" and ai_config["api_key"]:
         try:
-            return _analyze_brand_text_openai(normalized_text, api_key)
+            return _analyze_brand_text_openai(
+                normalized_text,
+                api_key=ai_config["api_key"],
+                model=ai_config["model"],
+                provider=ai_config["provider"],
+                base_url=ai_config["base_url"],
+            )
         except Exception as exc:
             profile = _analyze_brand_text_heuristic(normalized_text)
-            profile["analysis_warnings"] = [f"OpenAI brand extraction failed: {exc}"]
+            provider_name = "OpenRouter" if ai_config["provider"] == "openrouter" else "OpenAI"
+            profile["analysis_warnings"] = [f"{provider_name} brand extraction failed: {exc}"]
             return profile
 
     return _analyze_brand_text_heuristic(normalized_text)
 
 
-def _analyze_brand_text_openai(text: str, api_key: str) -> dict[str, Any]:
-    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    client = OpenAI(api_key=api_key)
+def _resolve_ai_config(ai_settings: dict[str, Any] | None = None) -> dict[str, Any]:
+    settings = ai_settings or {}
+    provider = str(settings.get("provider") or "").strip().lower()
+    if provider in {"", "auto"}:
+        provider = "openai" if os.getenv("OPENAI_API_KEY") else "heuristic"
+    if provider in {"none", "off", "heuristic only"}:
+        provider = "heuristic"
+    if provider not in {"heuristic", "openai", "openrouter"}:
+        provider = "heuristic"
+
+    if provider == "openai":
+        api_key = _clean_openai_key(settings.get("api_key") or os.getenv("OPENAI_API_KEY"))
+        if _is_placeholder_openai_key(api_key):
+            api_key = ""
+        return {
+            "provider": "openai",
+            "api_key": api_key,
+            "model": str(settings.get("model") or os.getenv("OPENAI_MODEL") or DEFAULT_OPENAI_MODEL).strip(),
+            "base_url": None,
+        }
+
+    if provider == "openrouter":
+        api_key = _clean_openai_key(settings.get("api_key") or os.getenv("OPENROUTER_API_KEY"))
+        if _is_placeholder_openai_key(api_key) or _is_placeholder_openrouter_key(api_key):
+            api_key = ""
+        return {
+            "provider": "openrouter",
+            "api_key": api_key,
+            "model": str(settings.get("model") or os.getenv("OPENROUTER_MODEL") or DEFAULT_OPENROUTER_MODEL).strip(),
+            "base_url": OPENROUTER_BASE_URL,
+        }
+
+    return {"provider": "heuristic", "api_key": "", "model": "", "base_url": None}
+
+
+def _analyze_brand_text_openai(
+    text: str,
+    *,
+    api_key: str,
+    model: str,
+    provider: str,
+    base_url: str | None,
+) -> dict[str, Any]:
+    client_kwargs: dict[str, Any] = {"api_key": api_key}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+        client_kwargs["default_headers"] = {
+            "HTTP-Referer": "http://localhost:8501",
+            "X-OpenRouter-Title": "Thai TikTok KOL Matcher",
+        }
+    client = OpenAI(**client_kwargs)
     response = client.chat.completions.create(
         model=model,
         temperature=0.1,
@@ -132,10 +195,10 @@ def _analyze_brand_text_openai(text: str, api_key: str) -> dict[str, Any]:
     )
     content = response.choices[0].message.content or "{}"
     parsed = json.loads(content)
-    return _validated_openai_profile(parsed)
+    return _validated_openai_profile(parsed, analysis_mode=provider)
 
 
-def _validated_openai_profile(parsed: dict[str, Any]) -> dict[str, Any]:
+def _validated_openai_profile(parsed: dict[str, Any], analysis_mode: str = "openai") -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError("OpenAI response was not a JSON object")
     category = _string_value(parsed.get("category"), "unknown")
@@ -147,7 +210,7 @@ def _validated_openai_profile(parsed: dict[str, Any]) -> dict[str, Any]:
         "locations": _string_list(parsed.get("locations")),
         "content_pillars": _string_list(parsed.get("content_pillars")),
         "thai_search_terms": _string_list(parsed.get("thai_search_terms")),
-        "analysis_mode": "openai",
+        "analysis_mode": analysis_mode,
         "analysis_warnings": [],
         "summary": _string_value(parsed.get("summary"), "Brand text was analyzed with OpenAI."),
     }
@@ -212,6 +275,13 @@ def _is_placeholder_openai_key(value: str) -> bool:
         "your-openai-key",
         "paste-your-real-openai-api-key-here",
         "paste-your-real-openai-api-token-here",
+    }
+
+
+def _is_placeholder_openrouter_key(value: str) -> bool:
+    return value.lower() in {
+        "your-openrouter-key",
+        "paste-your-real-openrouter-api-key-here",
     }
 
 

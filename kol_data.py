@@ -58,12 +58,16 @@ def load_sample_kols(path: Path = DATA_PATH) -> pd.DataFrame:
     return df
 
 
-def load_kols(use_apify: bool = False, brand_profile: dict[str, Any] | None = None) -> tuple[pd.DataFrame, list[str]]:
+def load_kols(
+    use_apify: bool = False,
+    brand_profile: dict[str, Any] | None = None,
+    apify_token: str | None = None,
+) -> tuple[pd.DataFrame, list[str]]:
     warnings: list[str] = []
     if not use_apify:
         return load_sample_kols(), warnings
 
-    api_token = _clean_apify_token(os.getenv("APIFY_TOKEN"))
+    api_token = _clean_apify_token(apify_token if apify_token is not None else os.getenv("APIFY_TOKEN"))
     if not api_token:
         warnings.append("APIFY_TOKEN is missing, so the app is using the bundled sample KOL dataset.")
         return load_sample_kols(), warnings
@@ -75,7 +79,7 @@ def load_kols(use_apify: bool = False, brand_profile: dict[str, Any] | None = No
         return load_sample_kols(), warnings
 
     try:
-        live_kols = fetch_apify_kols(brand_profile=brand_profile)
+        live_kols = fetch_apify_kols(brand_profile=brand_profile, token=api_token)
     except ApifyFetchError as exc:
         warnings.append(f"Apify live fetch failed: {exc}. Using the bundled sample KOL dataset.")
         return load_sample_kols(), warnings
