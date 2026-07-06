@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 TEXT_CAP = 12000
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
-DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini"
+DEFAULT_OPENROUTER_MODEL = "openai/gpt-oss-20b:free"
 
 KEYWORD_PATTERNS: dict[str, tuple[str, ...]] = {
     "coffee": ("coffee", "espresso", "latte", "cappuccino", "americano"),
@@ -171,31 +171,65 @@ def _analyze_brand_text_openai(
             "X-OpenRouter-Title": "Thai TikTok KOL Matcher",
         }
     client = OpenAI(**client_kwargs)
-    response = client.chat.completions.create(
-        model=model,
-        temperature=0.1,
-        response_format={"type": "json_object"},
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Extract a concise influencer-matching brand profile as JSON only. "
-                    "Use snake_case strings. Include Thai market search terms when relevant."
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    "Return JSON with keys: category, keywords, target_audience, tone, locations, "
-                    "content_pillars, thai_search_terms, summary. Brand text:\n"
-                    f"{text[:TEXT_CAP]}"
-                ),
-            },
-        ],
-    )
-    content = response.choices[0].message.content or "{}"
-    parsed = json.loads(content)
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "Extract a concise influencer-matching brand profile as JSON only. "
+                "Use snake_case strings. Include Thai market search terms when relevant."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                "Return JSON with keys: category, keywords, target_audience, tone, locations, "
+                "content_pillars, thai_search_terms, summary. Brand text:\n"
+                f"{text[:TEXT_CAP]}"
+            ),
+        },
+    ]
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            temperature=0.1,
+            response_format={"type": "json_object"},
+            messages=messages,
+        )
+        parsed = _parse_ai_json_content(response.choices[0].message.content)
+    except ValueError:
+        if provider != "openrouter":
+            raise
+        response = client.chat.completions.create(
+            model=model,
+            temperature=0.1,
+            messages=messages,
+        )
+        parsed = _parse_ai_json_content(response.choices[0].message.content)
     return _validated_openai_profile(parsed, analysis_mode=provider)
+
+
+def _parse_ai_json_content(content: Any) -> dict[str, Any]:
+    text = str(content or "").strip()
+    if not text:
+        raise ValueError("AI provider returned empty content. Try another model or disable AI extraction.")
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        json_text = _extract_json_object(text)
+        if not json_text:
+            raise ValueError("AI provider did not return valid JSON. Try another model.") from exc
+        parsed = json.loads(json_text)
+    if not isinstance(parsed, dict):
+        raise ValueError("AI provider returned JSON, but it was not an object.")
+    return parsed
+
+
+def _extract_json_object(text: str) -> str:
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return ""
+    return text[start : end + 1]
 
 
 def _validated_openai_profile(parsed: dict[str, Any], analysis_mode: str = "openai") -> dict[str, Any]:

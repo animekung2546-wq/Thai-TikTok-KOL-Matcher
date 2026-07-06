@@ -12,7 +12,7 @@ The app helps a marketing team analyze a client's website, Facebook page, or pas
 - Branch: `master`
 - App entrypoint: `app.py`
 - Local app URL when running: `http://localhost:8501`
-- Test suite: `37 passed` on the last verified run
+- Test suite: `39 passed` on the last verified run
 - The app runs without API keys by using heuristic analysis and bundled sample KOL data.
 - API keys can be entered directly in the Streamlit sidebar for the current session.
 - Optional environment variables:
@@ -43,7 +43,7 @@ streamlit run app.py
 Expected result:
 
 ```txt
-37 passed
+39 passed
 ```
 
 ## Main Files
@@ -91,7 +91,7 @@ The matcher returns a `match_score`, component scores, and a recommendation reas
 
 The sample KOL dataset contains 24 rows. Demographic fields use `demographics_source=sample_estimate` so downstream users know these values are prototype metadata, not verified audience data.
 
-AI brand extraction returns category, keywords, audience, tone, locations, content pillars, Thai search terms, and a summary. The Streamlit sidebar supports Heuristic only, OpenAI, and OpenRouter. OpenRouter uses the OpenAI-compatible base URL `https://openrouter.ai/api/v1`. If the selected provider is unavailable or returns invalid JSON, the app falls back to heuristic extraction and shows a warning.
+AI brand extraction returns category, keywords, audience, tone, locations, content pillars, Thai search terms, and a summary. The Streamlit sidebar supports Heuristic only, OpenAI, and OpenRouter. OpenRouter uses the OpenAI-compatible base URL `https://openrouter.ai/api/v1`, defaults to `openai/gpt-oss-20b:free`, and exposes free-model presets. If OpenRouter returns empty/non-JSON content, the app retries once without JSON mode before falling back to heuristic extraction with a warning.
 
 Apify normalization uses `demographics_source=live_unverified` by default for raw live records. When `APIFY_TOKEN` exists and the sidebar Apify option is enabled, the app calls an Apify Actor and normalizes dataset items into the KOL schema. Live rows must pass both brand relevance and Thai-market signal filters before ranking. If the Actor fails or returns no usable profiles, the app falls back to the sample dataset and shows a warning.
 

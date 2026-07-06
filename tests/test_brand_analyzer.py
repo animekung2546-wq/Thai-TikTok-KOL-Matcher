@@ -22,9 +22,12 @@ class FakeOpenAIResponse:
 class FakeChatCompletions:
     calls = []
     response_content = "{}"
+    response_sequence = []
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
+        if self.response_sequence:
+            return FakeOpenAIResponse(self.response_sequence.pop(0))
         return FakeOpenAIResponse(self.response_content)
 
 
@@ -87,6 +90,7 @@ def test_openai_key_uses_ai_brand_extraction(monkeypatch):
 
 def test_openrouter_provider_uses_openrouter_base_url(monkeypatch):
     FakeChatCompletions.calls = []
+    FakeChatCompletions.response_sequence = []
     FakeOpenAIClient.init_calls = []
     FakeChatCompletions.response_content = """
     {
@@ -116,6 +120,43 @@ def test_openrouter_provider_uses_openrouter_base_url(monkeypatch):
     assert FakeOpenAIClient.init_calls[0]["api_key"] == "sk-or-test"
     assert str(FakeOpenAIClient.init_calls[0]["base_url"]) == "https://openrouter.ai/api/v1"
     assert FakeChatCompletions.calls[0]["model"] == "openai/gpt-4o-mini"
+
+
+def test_openrouter_empty_json_response_retries_without_response_format(monkeypatch):
+    FakeChatCompletions.calls = []
+    FakeOpenAIClient.init_calls = []
+    FakeChatCompletions.response_sequence = [
+        "",
+        'Here is the profile: {"category":"cafe_restaurant","keywords":["cafe"],"target_audience":[],"tone":["cozy"],"locations":["Bangkok"],"content_pillars":["specialty coffee"],"thai_search_terms":["bangkokcafe"],"summary":"Bangkok cafe."}',
+    ]
+    monkeypatch.setattr(brand_analyzer, "OpenAI", FakeOpenAIClient)
+
+    profile = analyze_brand_text(
+        "Bangkok cafe",
+        ai_settings={"provider": "openrouter", "api_key": "sk-or-test", "model": "openai/gpt-oss-20b:free"},
+    )
+
+    assert profile["analysis_mode"] == "openrouter"
+    assert profile["category"] == "cafe_restaurant"
+    assert len(FakeChatCompletions.calls) == 2
+    assert "response_format" in FakeChatCompletions.calls[0]
+    assert "response_format" not in FakeChatCompletions.calls[1]
+
+
+def test_openrouter_empty_content_warning_is_readable(monkeypatch):
+    FakeChatCompletions.calls = []
+    FakeOpenAIClient.init_calls = []
+    FakeChatCompletions.response_sequence = ["", ""]
+    monkeypatch.setattr(brand_analyzer, "OpenAI", FakeOpenAIClient)
+
+    profile = analyze_brand_text(
+        "Bangkok cafe serving coffee",
+        ai_settings={"provider": "openrouter", "api_key": "sk-or-test", "model": "openai/gpt-oss-20b:free"},
+    )
+
+    assert profile["analysis_mode"] == "heuristic"
+    assert "AI provider returned empty content" in profile["analysis_warnings"][0]
+    assert "Expecting value" not in profile["analysis_warnings"][0]
 
 
 def test_heuristic_provider_skips_configured_api_key(monkeypatch):

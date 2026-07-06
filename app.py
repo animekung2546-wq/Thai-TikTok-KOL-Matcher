@@ -17,6 +17,14 @@ office workers, students, tourists, and cafe hoppers who enjoy aesthetic cafe
 content, weekend brunch, and friendly neighborhood service.
 """
 
+OPENROUTER_MODEL_OPTIONS = [
+    "openai/gpt-oss-20b:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+]
+
 
 st.set_page_config(page_title="Thai TikTok KOL Matcher", page_icon="TH", layout="wide")
 
@@ -42,10 +50,23 @@ with st.sidebar:
         type="password",
         placeholder="sk-or-...",
     )
-    openrouter_model = st.text_input(
-        "OpenRouter model",
-        value=os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
+    env_openrouter_model = os.getenv("OPENROUTER_MODEL", "")
+    openrouter_default_index = (
+        OPENROUTER_MODEL_OPTIONS.index(env_openrouter_model)
+        if env_openrouter_model in OPENROUTER_MODEL_OPTIONS
+        else 0
     )
+    openrouter_model_preset = st.selectbox(
+        "OpenRouter model preset",
+        OPENROUTER_MODEL_OPTIONS,
+        index=openrouter_default_index,
+    )
+    openrouter_custom_model = st.text_input(
+        "Custom OpenRouter model",
+        value="" if env_openrouter_model in {"", *OPENROUTER_MODEL_OPTIONS} else env_openrouter_model,
+        placeholder="provider/model:free",
+    )
+    openrouter_model = openrouter_custom_model.strip() or openrouter_model_preset
     apify_token = st.text_input(
         "Apify token",
         value=os.getenv("APIFY_TOKEN", ""),
